@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bay Flip - Real Estate Deal Finder</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --surface-color: #191c24;
+            --surface-hover: #1e2230;
+            --text-primary: #f0f2f5;
+            --text-secondary: #8b92a5;
+            --border-color: rgba(255,255,255,0.06);
+            --accent-green: #00e676;
+            --accent-amber: #ffbf69;
+            --accent-blue: #2979ff;
+            --accent-red: #ff5252;
+            --accent-purple: #bb86fc;
+            
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-feature-settings: 'tnum';
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+        .text-muted { color: var(--text-secondary); }
+        
+        /* Layout Utilities */
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+
+        /* Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(15, 17, 21, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 0;
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo span {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* KPI Bar */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .kpi-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: var(--border-color);
+            transition: var(--transition-smooth);
+        }
+        .kpi-card:nth-child(1):hover::before { background: var(--accent-blue); }
+        .kpi-card:nth-child(2):hover::before { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+        .kpi-card:nth-child(3):hover::before { background: var(--accent-purple); }
+        .kpi-card:nth-child(4):hover::before { background: var(--accent-amber); }
+        
+        .kpi-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+        
+        /* Filters */
+        .filters-section {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        select, input {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+        select:focus, input:focus {
+            border-color: var(--accent-blue);
+        }
+        .btn {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: var(--transition-smooth);
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .btn-primary {
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+        }
+        .btn-primary:hover {
+            background: #1e62d4;
+        }
+
+        /* View Toggle */
+        .view-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .toggle-group {
+            display: flex;
+            background: var(--surface-color);
+            border-radius: 8px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+        }
+        .toggle-btn {
+            padding: 6px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition-smooth);
+        }
+        .toggle-btn.active {
+            background: var(--surface-hover);
+            color: var(--text-primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Cards Grid */
+        #cards-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .deal-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: var(--transition-smooth);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .deal-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .card-header {
+            padding: 20px 20px 10px;
+            position: relative;
+        }
+        .score-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #000;
+            box-shadow: 0 0 15px currentColor;
+        }
+        .tier-strong { background: var(--accent-green); color: #000; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); }
+        .tier-worth { background: var(--accent-amber); color: #000; box-shadow: 0 0 15px rgba(255, 191, 105, 0.4); }
+        .tier-monitor { background: var(--accent-blue); color: #fff; box-shadow: 0 0 15px rgba(41, 121, 255, 0.4); }
+        .tier-pass { background: var(--accent-red); color: #fff; box-shadow: 0 0 15px rgba(255, 82, 82, 0.4); }
+        
+        .price {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        .address {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .location {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        
+        .card-body {
+            padding: 15px 20px;
+            flex-grow: 1;
+        }
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .tag {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .tag-dom-high { border-color: var(--accent-red); color: var(--accent-red); }
+        
+        .ai-analysis {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            background: rgba(187, 134, 252, 0.05);
+            border-left: 3px solid var(--accent-purple);
+            padding: 10px 15px;
+            border-radius: 0 6px 6px 0;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .card-footer {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .card-footer .btn { flex-grow: 1; text-align: center; text-decoration: none; }
+
+        /* Map View */
+        #map-view {
+            display: none;
+            height: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 40px;
+        }
+        
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .chart-container {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            height: 300px;
+            position: relative;
+        }
+
+        /* History Table */
+        .history-section {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 40px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding: 20px 0;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        /* Custom Map Tooltips */
+        .leaflet-popup-content-wrapper {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip { background: var(--surface-color); }
+        .map-popup h4 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .map-popup p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                🏠 <span>Bay Flip</span>
+            </div>
+            <div class="header-meta">
+                Last updated: 2026-08-02 14:04:23
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">Total Deals Scanned</div>
+                <div class="kpi-value" id="kpi-total">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Strong Buys Found</div>
+                <div class="kpi-value" style="color: var(--accent-green)" id="kpi-strong">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Average Deal Score</div>
+                <div class="kpi-value" id="kpi-avg">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Best Deal</div>
+                <div class="kpi-value" style="font-size: 1.2rem; line-height: 1.2; margin-top: 10px;" id="kpi-best">N/A</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <label class="filter-label">County</label>
+                <select id="filter-county">
+                    <option value="all">All Counties</option>
+                    <option value="San Francisco">San Francisco</option>
+                    <option value="Alameda">Alameda</option>
+                    <option value="Contra Costa">Contra Costa</option>
+                    <option value="Marin">Marin</option>
+                    <option value="Napa">Napa</option>
+                    <option value="San Mateo">San Mateo</option>
+                    <option value="Santa Clara">Santa Clara</option>
+                    <option value="Sonoma">Sonoma</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Score Tier</label>
+                <select id="filter-tier">
+                    <option value="all">All Tiers</option>
+                    <option value="Strong Buy">🔥 Strong Buy</option>
+                    <option value="Worth a Look">⚡ Worth a Look</option>
+                    <option value="Monitor">📊 Monitor</option>
+                    <option value="Pass">❌ Pass</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Max Price</label>
+                <select id="filter-price">
+                    <option value="99999999">Any Price</option>
+                    <option value="1000000">< $1M</option>
+                    <option value="1500000">< $1.5M</option>
+                    <option value="2000000">< $2M</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input type="text" id="filter-search" placeholder="City, Zip, Keyword...">
+            </div>
+            <button class="btn" id="btn-clear-filters" style="margin-top: 20px;">Clear All</button>
+        </div>
+
+        <!-- View Controls -->
+        <div class="view-controls">
+            <div>
+                <span id="results-count" class="text-muted" style="font-weight: 600;">0 properties found</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="filter-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                    <label class="filter-label" style="margin: 0;">Sort By</label>
+                    <select id="sort-select">
+                        <option value="score_desc">Score (High to Low)</option>
+                        <option value="price_asc">Price (Low to High)</option>
+                        <option value="price_desc">Price (High to Low)</option>
+                        <option value="dom_asc">Days on Market (Low to High)</option>
+                    </select>
+                </div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-view="cards">Cards</button>
+                    <button class="toggle-btn" data-view="map">Map</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Views -->
+        <div id="cards-view">
+            <!-- Cards generated by JS -->
+        </div>
+
+        <div id="map-view">
+            <!-- Map container -->
+        </div>
+        
+        <!-- Analytics -->
+        <h3 class="mb-6">Analytics</h3>
+        <div class="charts-section">
+            <div class="chart-container">
+                <canvas id="chart-score"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-price"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-dom"></canvas>
+            </div>
+        </div>
+
+        <!-- History -->
+        <h3 class="mb-6">Scan History</h3>
+        <div class="history-section">
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Source</th>
+                        <th>Scanned</th>
+                        <th>New Deals</th>
+                        <th>Top Deal</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table rows generated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            Built with Bay Flip v1.0 • Data generated at 2026-08-02 14:04:23
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
+    <script>
+        // Data injected from Python
+        const PROPERTIES = [{"id": 1, "address": "1610 Capell Valley Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1149000, "beds": 3, "baths": 2.0, "sqft": 2446, "lot_sqft": 43560, "year_built": 1967, "dom": 90, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 470.0, "distress_signals": [], "ai_analysis": null, "lat": 38.460385, "lng": -122.219183, "url": null}, {"id": 2, "address": "11 Lukens Pl", "city": "Angwin", "county": null, "zip": "94508", "price": 1095000, "beds": 6, "baths": 4.0, "sqft": 2805, "lot_sqft": 45302, "year_built": 1938, "dom": 103, "score": 70.0, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 390.0, "distress_signals": [], "ai_analysis": null, "lat": 38.580381, "lng": -122.4395277, "url": null}, {"id": 3, "address": "1101 Olive Hill Ln", "city": "Napa", "county": null, "zip": "94558", "price": 868000, "beds": 5, "baths": 4.0, "sqft": 4574, "lot_sqft": 43560, "year_built": 1972, "dom": 125, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 190.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3295883, "lng": -122.2417274, "url": null}, {"id": 4, "address": "4593 Dry Creek Rd", "city": "Napa", "county": null, "zip": "94558", "price": 874000, "beds": 3, "baths": 2.0, "sqft": 1602, "lot_sqft": 77537, "year_built": 1972, "dom": 128, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 546.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3627058, "lng": -122.3738518, "url": null}, {"id": 5, "address": "993 Champion Ln", "city": "Deer Park", "county": null, "zip": "94576", "price": 750000, "beds": 3, "baths": 2.0, "sqft": 1782, "lot_sqft": 28636, "year_built": 1958, "dom": 135, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 421.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5511072, "lng": -122.472586, "url": null}, {"id": 6, "address": "304 High St", "city": "Calistoga", "county": null, "zip": "94515", "price": 1050000, "beds": 3, "baths": 2.0, "sqft": 1880, "lot_sqft": 17380, "year_built": 1969, "dom": 145, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 559.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5773873, "lng": -122.5907015, "url": null}, {"id": 7, "address": "405 Cold Springs Rd", "city": "Angwin", "county": null, "zip": "94508", "price": 1991000, "beds": 4, "baths": 4.0, "sqft": 3742, "lot_sqft": 93654, "year_built": 1920, "dom": 160, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 532.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5579002, "lng": -122.4316467, "url": null}, {"id": 8, "address": "420 Sky Oaks Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 795000, "beds": 3, "baths": 2.0, "sqft": 1619, "lot_sqft": 13094, "year_built": 1960, "dom": 361, "score": 70.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 491.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5773059, "lng": -122.4526473, "url": null}, {"id": 9, "address": "473 Newton Way", "city": "Angwin", "county": null, "zip": "94508", "price": 1349000, "beds": 7, "baths": 6.0, "sqft": 2661, "lot_sqft": 20112, "year_built": 1946, "dom": 452, "score": 70.0, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 507.0, "distress_signals": [], "ai_analysis": null, "lat": 38.581049, "lng": -122.448701, "url": null}, {"id": 10, "address": "541 Sunset Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1375000, "beds": 3, "baths": 2.5, "sqft": 2454, "lot_sqft": 22211, "year_built": 1974, "dom": 104, "score": 69.98, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 560.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5580763, "lng": -122.456203, "url": null}, {"id": 11, "address": "1138 Lokoya Rd", "city": "Napa", "county": null, "zip": "94558", "price": 795000, "beds": 3, "baths": 2.0, "sqft": 1417, "lot_sqft": 61420, "year_built": 1940, "dom": 371, "score": 69.87, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 561.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3709249, "lng": -122.4222161, "url": null}, {"id": 12, "address": "1195 Congress Valley Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1995000, "beds": 4, "baths": 4.0, "sqft": 3525, "lot_sqft": 106286, "year_built": 1940, "dom": 126, "score": 69.35, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 566.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2864233, "lng": -122.3334529, "url": null}, {"id": 13, "address": "1124 Shetler Ave", "city": "Napa", "county": null, "zip": "94559", "price": 775000, "beds": 4, "baths": 2.0, "sqft": 1566, "lot_sqft": 7340, "year_built": 1955, "dom": 116, "score": 68.75, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 495.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2829157, "lng": -122.267857, "url": null}, {"id": 14, "address": "3196 Scenic Dr", "city": "Napa", "county": null, "zip": "94558", "price": 929000, "beds": 3, "baths": 2.0, "sqft": 1640, "lot_sqft": 7614, "year_built": 1961, "dom": 118, "score": 67.92, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 566.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3061141, "lng": -122.3256392, "url": null}, {"id": 15, "address": "1201 Edwards St", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1290000, "beds": 3, "baths": 2.0, "sqft": 2296, "lot_sqft": 10363, "year_built": 1890, "dom": 115, "score": 67.82, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 562.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5051329, "lng": -122.4668271, "url": null}, {"id": 16, "address": "3051 Redwood Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1875000, "beds": 3, "baths": 4.0, "sqft": 3209, "lot_sqft": 162914, "year_built": 1975, "dom": 296, "score": 67.48, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 584.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3167512, "lng": -122.3448836, "url": null}, {"id": 17, "address": "2239 Redwood Rd Unit ABC", "city": "Napa", "county": null, "zip": "94558", "price": 1789000, "beds": 9, "baths": 6.0, "sqft": 5067, "lot_sqft": 20904, "year_built": 1974, "dom": 129, "score": 66.5, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 353.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3197636, "lng": -122.3151676, "url": null}, {"id": 18, "address": "3581 Young Ave", "city": "Napa", "county": null, "zip": "94558", "price": 899000, "beds": 3, "baths": 2.0, "sqft": 1688, "lot_sqft": 7266, "year_built": 1964, "dom": 82, "score": 65.22, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 533.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3209961, "lng": -122.3232948, "url": null}, {"id": 19, "address": "625 - 629 Hill Rd", "city": "Angwin", "county": null, "zip": "94508", "price": 1149000, "beds": 4, "baths": 3.5, "sqft": 2409, "lot_sqft": 133729, "year_built": 1956, "dom": 70, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 477.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5858327, "lng": -122.4451819, "url": null}, {"id": 20, "address": "20 Catania Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1999000, "beds": 5, "baths": 3.5, "sqft": 3817, "lot_sqft": 26428, "year_built": 2005, "dom": 95, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 524.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3279616, "lng": -122.2901456, "url": null}, {"id": 21, "address": "1250 Partrick Rd Unit B", "city": "Napa", "county": null, "zip": "94558", "price": 1399000, "beds": 6, "baths": 4.0, "sqft": 6800, "lot_sqft": 436471, "year_built": 1985, "dom": 100, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 206.0, "distress_signals": [], "ai_analysis": null, "lat": 38.318182, "lng": -122.3556784, "url": null}, {"id": 22, "address": "4084 Atlas Peak Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1000500, "beds": 5, "baths": 3.5, "sqft": 2788, "lot_sqft": 42894, "year_built": 1987, "dom": 125, "score": 65.0, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 359.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4289931, "lng": -122.2469314, "url": null}, {"id": 23, "address": "1619 Foothill Blvd", "city": "Calistoga", "county": null, "zip": "94515", "price": 759500, "beds": 3, "baths": 2.5, "sqft": 1504, "lot_sqft": 8233, "year_built": 1987, "dom": 129, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 505.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5771248, "lng": -122.5867162, "url": null}, {"id": 24, "address": "1250 Partrick Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1399000, "beds": 6, "baths": 4.0, "sqft": 6800, "lot_sqft": 436471, "year_built": 1985, "dom": 130, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 206.0, "distress_signals": [], "ai_analysis": null, "lat": 38.318182, "lng": -122.3556784, "url": null}, {"id": 25, "address": "125 White Cottage Rd N", "city": "Angwin", "county": null, "zip": "94508", "price": 1595000, "beds": 4, "baths": 3.5, "sqft": 3230, "lot_sqft": 77101, "year_built": 1994, "dom": 132, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 494.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5766453, "lng": -122.4567438, "url": null}, {"id": 26, "address": "12 Cold Springs Rd", "city": "Angwin", "county": null, "zip": "94508", "price": 895000, "beds": 3, "baths": 2.0, "sqft": 2376, "lot_sqft": 12579, "year_built": 1978, "dom": 139, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 377.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5650974, "lng": -122.4400885, "url": null}, {"id": 27, "address": "1884 Silverado Trl", "city": "Napa", "county": null, "zip": "94558", "price": 1995000, "beds": 4, "baths": 3.5, "sqft": 3941, "lot_sqft": 27878, "year_built": 1989, "dom": 142, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 506.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3180736, "lng": -122.2704153, "url": null}, {"id": 28, "address": "807 Deer Park Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 895000, "beds": 3, "baths": 2.0, "sqft": 1600, "lot_sqft": 22834, "year_built": 1981, "dom": 149, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 559.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5445213, "lng": -122.4698012, "url": null}, {"id": 29, "address": "1275 Summit Lake Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1490000, "beds": 4, "baths": 3.5, "sqft": 3260, "lot_sqft": 226512, "year_built": 1982, "dom": 153, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 457.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5955212, "lng": -122.4529401, "url": null}, {"id": 30, "address": "540 Edgemont Ln", "city": "Angwin", "county": null, "zip": "94508", "price": 1410000, "beds": 5, "baths": 2.5, "sqft": 2631, "lot_sqft": 81457, "year_built": 1995, "dom": 1004, "score": 65.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 536.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5558549, "lng": -122.4518128, "url": null}, {"id": 31, "address": "1504 Meek Ave", "city": "Napa", "county": null, "zip": "94559", "price": 839000, "beds": 3, "baths": 2.0, "sqft": 1490, "lot_sqft": 6726, "year_built": 1940, "dom": 78, "score": 64.72, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 563.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3072665, "lng": -122.2714814, "url": null}, {"id": 32, "address": "520 - 526 Madison St", "city": "Napa", "county": null, "zip": "94559", "price": 975000, "beds": 4, "baths": 2.0, "sqft": 1882, "lot_sqft": 6848, "year_built": 1951, "dom": 103, "score": 64.55, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 518.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2929959, "lng": -122.294873, "url": null}, {"id": 33, "address": "920 Crestmont Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 975000, "beds": 5, "baths": 4.0, "sqft": 3489, "lot_sqft": 172062, "year_built": 1983, "dom": 88, "score": 64.5, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 279.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5554402, "lng": -122.465476, "url": null}, {"id": 34, "address": "2968 Woodcrest Dr", "city": "Napa", "county": null, "zip": "94558", "price": 975000, "beds": 4, "baths": 2.0, "sqft": 2082, "lot_sqft": 7322, "year_built": 1973, "dom": 95, "score": 64.07, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 468.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3152751, "lng": -122.3266188, "url": null}, {"id": 35, "address": "1125 Westview Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1599000, "beds": 5, "baths": 3.0, "sqft": 2803, "lot_sqft": 27491, "year_built": 1992, "dom": 153, "score": 63.93, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 570.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3120126, "lng": -122.3317856, "url": null}, {"id": 36, "address": "1231 Stevenson St", "city": "Calistoga", "county": null, "zip": "94515", "price": 950000, "beds": 3, "baths": 1.5, "sqft": 1850, "lot_sqft": 6338, "year_built": 1948, "dom": 234, "score": 63.7, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 514.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5823565, "lng": -122.577885, "url": null}, {"id": 37, "address": "4139 Via La Paz", "city": "Napa", "county": null, "zip": "94558", "price": 865000, "beds": 4, "baths": 2.5, "sqft": 1968, "lot_sqft": 6408, "year_built": 1974, "dom": 123, "score": 63.02, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 440.0, "distress_signals": [], "ai_analysis": null, "lat": 38.336829, "lng": -122.3175788, "url": null}, {"id": 38, "address": "3260 State Highway 128", "city": "Calistoga", "county": null, "zip": "94515", "price": 1399000, "beds": 5, "baths": 2.0, "sqft": 2214, "lot_sqft": 47916, "year_built": 1920, "dom": 107, "score": 62.48, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 632.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5949953, "lng": -122.6136433, "url": null}, {"id": 39, "address": "1018 Oakmont Ct", "city": "Napa", "county": null, "zip": "94559", "price": 1384000, "beds": 4, "baths": 2.5, "sqft": 2484, "lot_sqft": 10498, "year_built": 1987, "dom": 116, "score": 61.9, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 557.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2944209, "lng": -122.2660555, "url": null}, {"id": 40, "address": "1008 Evans Ave", "city": "Napa", "county": null, "zip": "94559", "price": 1295000, "beds": 4, "baths": 4.5, "sqft": 2190, "lot_sqft": 8028, "year_built": 1923, "dom": 165, "score": 61.41, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 591.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3005345, "lng": -122.2758214, "url": null}, {"id": 41, "address": "1081 Tamarisk Dr Unit A", "city": "Napa", "county": null, "zip": "94559", "price": 1998000, "beds": 4, "baths": 3.5, "sqft": 3359, "lot_sqft": 17768, "year_built": 1987, "dom": 138, "score": 61.33, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 595.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2948169, "lng": -122.2636154, "url": null}, {"id": 42, "address": "15 Glen Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1299000, "beds": 4, "baths": 3.0, "sqft": 2359, "lot_sqft": 9496, "year_built": 1981, "dom": 116, "score": 61.1, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 551.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3133547, "lng": -122.3201426, "url": null}, {"id": 43, "address": "308 E Berna Ave", "city": "Napa", "county": null, "zip": "94559", "price": 840000, "beds": 3, "baths": 2.0, "sqft": 1485, "lot_sqft": 7179, "year_built": 1942, "dom": 58, "score": 60.69, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 566.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3051751, "lng": -122.270457, "url": null}, {"id": 44, "address": "1411 4th St", "city": "Calistoga", "county": null, "zip": "94515", "price": 985000, "beds": 5, "baths": 3.0, "sqft": 2286, "lot_sqft": 6098, "year_built": 1959, "dom": 347, "score": 60.67, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 431.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5809402, "lng": -122.5826726, "url": null}, {"id": 45, "address": "3493 Westminster Way", "city": "Napa", "county": null, "zip": "94558", "price": 1525000, "beds": 4, "baths": 3.0, "sqft": 2977, "lot_sqft": 11644, "year_built": 1989, "dom": 108, "score": 60.65, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 512.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3113624, "lng": -122.3405602, "url": null}, {"id": 46, "address": "1418 B St", "city": "Napa", "county": null, "zip": "94559", "price": 1295000, "beds": 6, "baths": 4.0, "sqft": 2764, "lot_sqft": 7083, "year_built": 1900, "dom": 163, "score": 60.25, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 469.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3021932, "lng": -122.2954645, "url": null}, {"id": 47, "address": "2610 Atlas Peak Rd #3", "city": "Napa", "county": null, "zip": "94558", "price": 850000, "beds": 4, "baths": 4.0, "sqft": 3914, "lot_sqft": 1364299, "year_built": 2016, "dom": 226, "score": 60.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 217.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3701308, "lng": -122.2471271, "url": null}, {"id": 48, "address": "95 Longhorn Ridge Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1485000, "beds": 3, "baths": 2.5, "sqft": 3187, "lot_sqft": 3397680, "year_built": 2006, "dom": 244, "score": 60.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 466.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4071641, "lng": -122.1774805, "url": null}, {"id": 49, "address": "1090 1st Ave", "city": "Napa", "county": null, "zip": "94558", "price": 779000, "beds": 5, "baths": 4.0, "sqft": 3822, "lot_sqft": 60984, "year_built": 2018, "dom": 284, "score": 60.0, "tier": "Worth a Look", "property_type": "Single Family Residential", "price_per_sqft": 204.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3003093, "lng": -122.2507214, "url": null}, {"id": 50, "address": "234 Mariposa Dr #234", "city": "Angwin", "county": null, "zip": "94508", "price": 1120000, "beds": 8, "baths": 4.0, "sqft": 3300, "lot_sqft": 37671, "year_built": 2010, "dom": 356, "score": 60.0, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 339.0, "distress_signals": [], "ai_analysis": null, "lat": 38.577664, "lng": -122.451225, "url": null}, {"id": 51, "address": "228 - 234 Mariposa Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1120000, "beds": 8, "baths": 4.0, "sqft": 3300, "lot_sqft": 37671, "year_built": 2010, "dom": 356, "score": 60.0, "tier": "Worth a Look", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 339.0, "distress_signals": [], "ai_analysis": null, "lat": 38.577664, "lng": -122.451225, "url": null}, {"id": 52, "address": "4477 Tanglewood Way", "city": "Napa", "county": null, "zip": "94558", "price": 859999, "beds": 3, "baths": 2.0, "sqft": 1313, "lot_sqft": 6486, "year_built": 1971, "dom": 93, "score": 59.85, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 655.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3459049, "lng": -122.3186857, "url": null}, {"id": 53, "address": "601 Rossi Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1995000, "beds": 3, "baths": 2.5, "sqft": 3020, "lot_sqft": 111949, "year_built": 1957, "dom": 181, "score": 59.46, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 661.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5138016, "lng": -122.4149871, "url": null}, {"id": 54, "address": "3425 Redwood Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1485000, "beds": 3, "baths": 2.0, "sqft": 2623, "lot_sqft": 203425, "year_built": 2006, "dom": 135, "score": 59.35, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 566.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3298327, "lng": -122.3550464, "url": null}, {"id": 55, "address": "2303 - 2305 Main St", "city": "Napa", "county": null, "zip": "94558", "price": 1390000, "beds": 5, "baths": 2.0, "sqft": 2336, "lot_sqft": 12637, "year_built": 1900, "dom": 60, "score": 58.83, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 595.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3101305, "lng": -122.2939422, "url": null}, {"id": 56, "address": "1045 Summit Lake Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 895000, "beds": 3, "baths": 4.0, "sqft": 2765, "lot_sqft": 43996, "year_built": 1982, "dom": 65, "score": 58.75, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 324.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5928439, "lng": -122.4465307, "url": null}, {"id": 57, "address": "539 Keyes Ave", "city": "Angwin", "county": null, "zip": "94508", "price": 1295000, "beds": 3, "baths": 2.0, "sqft": 1994, "lot_sqft": 67082, "year_built": 1942, "dom": 82, "score": 58.71, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 649.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5774625, "lng": -122.4565465, "url": null}, {"id": 58, "address": "7878 Butts Canyon Rd", "city": "Pope Valley", "county": null, "zip": "94567", "price": 1625000, "beds": 3, "baths": 2.0, "sqft": 2615, "lot_sqft": 1799027, "year_built": 1994, "dom": 331, "score": 58.63, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 621.0, "distress_signals": [], "ai_analysis": null, "lat": 38.6644261, "lng": -122.4465147, "url": null}, {"id": 59, "address": "850 Conn Valley Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1995000, "beds": 3, "baths": 3.0, "sqft": 2979, "lot_sqft": 871200, "year_built": 1950, "dom": 314, "score": 58.53, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 670.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5182677, "lng": -122.4236839, "url": null}, {"id": 60, "address": "42 Clement Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1699000, "beds": 3, "baths": 2.5, "sqft": 3430, "lot_sqft": 11483, "year_built": 1991, "dom": 144, "score": 58.39, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 495.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2760449, "lng": -122.3077273, "url": null}, {"id": 61, "address": "14 Clement Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1198000, "beds": 4, "baths": 2.5, "sqft": 2324, "lot_sqft": 7667, "year_built": 1989, "dom": 129, "score": 58.2, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 515.0, "distress_signals": [], "ai_analysis": null, "lat": 38.275465, "lng": -122.30709, "url": null}, {"id": 62, "address": "1676 Paulson Way", "city": "Napa", "county": null, "zip": "94558", "price": 799000, "beds": 4, "baths": 2.0, "sqft": 1814, "lot_sqft": 8747, "year_built": 1972, "dom": 45, "score": 58.04, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 440.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3383713, "lng": -122.319785, "url": null}, {"id": 63, "address": "1236 El Centro Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1100000, "beds": 8, "baths": 4.0, "sqft": 3032, "lot_sqft": 22229, "year_built": 0, "dom": 82, "score": 58.0, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 363.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3364698, "lng": -122.3087788, "url": null}, {"id": 64, "address": "1850 - 1852 Laurel St", "city": "Napa", "county": null, "zip": "94559", "price": 930000, "beds": 4, "baths": 2.0, "sqft": 1492, "lot_sqft": 5423, "year_built": 1948, "dom": 103, "score": 57.96, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 623.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2928528, "lng": -122.2949308, "url": null}, {"id": 65, "address": "1720 Milton Rd W", "city": "Napa", "county": null, "zip": "94559", "price": 1150000, "beds": 3, "baths": 2.5, "sqft": 2030, "lot_sqft": 6887, "year_built": 1999, "dom": 679, "score": 57.82, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 567.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2021743, "lng": -122.3132173, "url": null}, {"id": 66, "address": "750 Deer Park Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1575000, "beds": 3, "baths": 4.0, "sqft": 3180, "lot_sqft": 51401, "year_built": 1957, "dom": 41, "score": 57.75, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 495.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5428025, "lng": -122.4690887, "url": null}, {"id": 67, "address": "113 Donaldson Way", "city": "American Canyon", "county": null, "zip": "94503", "price": 780000, "beds": 4, "baths": 2.5, "sqft": 1544, "lot_sqft": 7405, "year_built": 1952, "dom": 44, "score": 57.68, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 505.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1704085, "lng": -122.2588268, "url": null}, {"id": 68, "address": "18 Riverton Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1499000, "beds": 4, "baths": 2.5, "sqft": 2949, "lot_sqft": 12972, "year_built": 2011, "dom": 124, "score": 57.6, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 508.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3075105, "lng": -122.3445461, "url": null}, {"id": 69, "address": "1858 Hemlock St", "city": "Napa", "county": null, "zip": "94559", "price": 875000, "beds": 5, "baths": 2.0, "sqft": 1962, "lot_sqft": 7200, "year_built": 1950, "dom": 61, "score": 57.43, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 446.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2832743, "lng": -122.2947976, "url": null}, {"id": 70, "address": "2491 Vine Hill Dr", "city": "Napa", "county": null, "zip": "94558", "price": 885000, "beds": 3, "baths": 2.0, "sqft": 1432, "lot_sqft": 5998, "year_built": 1975, "dom": 75, "score": 56.94, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 618.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3282844, "lng": -122.3319452, "url": null}, {"id": 71, "address": "2083 Lernhart St", "city": "Napa", "county": null, "zip": "94559", "price": 959000, "beds": 4, "baths": 2.5, "sqft": 1880, "lot_sqft": 6721, "year_built": 1965, "dom": 60, "score": 56.8, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 510.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2835544, "lng": -122.2972483, "url": null}, {"id": 72, "address": "1498 Sierra Ave", "city": "Napa", "county": null, "zip": "94558", "price": 799000, "beds": 3, "baths": 2.0, "sqft": 1725, "lot_sqft": 9230, "year_built": 1954, "dom": 37, "score": 56.75, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 463.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3286752, "lng": -122.3065771, "url": null}, {"id": 73, "address": "747 3rd St Unit A + B", "city": "Napa", "county": null, "zip": "94559", "price": 1300000, "beds": 6, "baths": 3.0, "sqft": 2874, "lot_sqft": 4792, "year_built": 1887, "dom": 466, "score": 56.67, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 452.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2985373, "lng": -122.281044, "url": null}, {"id": 74, "address": "6575 Gordon Valley Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1490000, "beds": 7, "baths": 3.0, "sqft": 3683, "lot_sqft": 132422, "year_built": 1934, "dom": 36, "score": 56.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 405.0, "distress_signals": [], "ai_analysis": null, "lat": 38.339884, "lng": -122.1246939, "url": null}, {"id": 75, "address": "3886 Klamath Way", "city": "Napa", "county": null, "zip": "94558", "price": 890000, "beds": 3, "baths": 2.0, "sqft": 1474, "lot_sqft": 6726, "year_built": 1977, "dom": 79, "score": 55.9, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 604.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3296298, "lng": -122.3136608, "url": null}, {"id": 76, "address": "3541 Twin Oaks Dr", "city": "Napa", "county": null, "zip": "94558", "price": 929000, "beds": 4, "baths": 2.0, "sqft": 1334, "lot_sqft": 8028, "year_built": 1973, "dom": 124, "score": 55.82, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 696.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3025696, "lng": -122.345171, "url": null}, {"id": 77, "address": "4436 Morse Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1349000, "beds": 5, "baths": 2.5, "sqft": 2860, "lot_sqft": 7179, "year_built": 2000, "dom": 172, "score": 55.04, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 472.0, "distress_signals": [], "ai_analysis": null, "lat": 38.342975, "lng": -122.3209018, "url": null}, {"id": 78, "address": "1700 Sierra Ave", "city": "Napa", "county": null, "zip": "94558", "price": 775000, "beds": 3, "baths": 1.0, "sqft": 1434, "lot_sqft": 10302, "year_built": 1954, "dom": 19, "score": 55.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 540.0, "distress_signals": [], "ai_analysis": null, "lat": 38.328166, "lng": -122.3095732, "url": null}, {"id": 79, "address": "1116 Pinewood Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1650000, "beds": 4, "baths": 3.0, "sqft": 2718, "lot_sqft": 27007, "year_built": 1981, "dom": 68, "score": 54.58, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 607.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3083674, "lng": -122.3271156, "url": null}, {"id": 80, "address": "2642 W Pueblo Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1050000, "beds": 3, "baths": 2.0, "sqft": 1863, "lot_sqft": 13112, "year_built": 1973, "dom": 11, "score": 54.56, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 564.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3166822, "lng": -122.3266178, "url": null}, {"id": 81, "address": "1773 Crinella Dr", "city": "Saint Helena", "county": null, "zip": "94574", "price": 975000, "beds": 3, "baths": 2.5, "sqft": 1486, "lot_sqft": 8298, "year_built": 1969, "dom": 68, "score": 54.49, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 656.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5106393, "lng": -122.4747283, "url": null}, {"id": 82, "address": "18 Clement Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1659000, "beds": 4, "baths": 2.5, "sqft": 3059, "lot_sqft": 11308, "year_built": 1990, "dom": 68, "score": 54.29, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 542.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2752244, "lng": -122.3070804, "url": null}, {"id": 83, "address": "1051 Fabiola Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1150000, "beds": 3, "baths": 2.0, "sqft": 2030, "lot_sqft": 54450, "year_built": 1952, "dom": 12, "score": 54.25, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 567.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2967231, "lng": -122.2383757, "url": null}, {"id": 84, "address": "1203 Cayetano Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1065000, "beds": 4, "baths": 2.5, "sqft": 2067, "lot_sqft": 8925, "year_built": 2000, "dom": 57, "score": 54.02, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 515.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2885559, "lng": -122.2645499, "url": null}, {"id": 85, "address": "1639 San Vicente Ave", "city": "Napa", "county": null, "zip": "94558", "price": 798000, "beds": 3, "baths": 2.0, "sqft": 1851, "lot_sqft": 4138, "year_built": 1987, "dom": 286, "score": 53.94, "tier": "Monitor", "property_type": "Townhouse", "price_per_sqft": 431.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3367077, "lng": -122.314834, "url": null}, {"id": 86, "address": "4087 Maher St", "city": "Napa", "county": null, "zip": "94558", "price": 849000, "beds": 3, "baths": 2.0, "sqft": 1549, "lot_sqft": 7261, "year_built": 1975, "dom": 2, "score": 53.75, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 548.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3307343, "lng": -122.3230323, "url": null}, {"id": 87, "address": "1242 Madrona Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 765000, "beds": 3, "baths": 2.5, "sqft": 2124, "lot_sqft": 9836, "year_built": 1935, "dom": 19, "score": 53.52, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 360.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5065127, "lng": -122.4740609, "url": null}, {"id": 88, "address": "1145 Eggleston St", "city": "Napa", "county": null, "zip": "94559", "price": 799000, "beds": 3, "baths": 2.0, "sqft": 1393, "lot_sqft": 13970, "year_built": 1910, "dom": 24, "score": 53.52, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 574.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3023443, "lng": -122.2915662, "url": null}, {"id": 89, "address": "51 Regatta Way", "city": "Napa", "county": null, "zip": "94559", "price": 1150000, "beds": 3, "baths": 2.0, "sqft": 1855, "lot_sqft": 6852, "year_built": 1996, "dom": 145, "score": 53.51, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 620.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2753268, "lng": -122.2922094, "url": null}, {"id": 90, "address": "4435 Rockwood Ave", "city": "Napa", "county": null, "zip": "94558", "price": 779000, "beds": 3, "baths": 2.0, "sqft": 1341, "lot_sqft": 6512, "year_built": 1971, "dom": 5, "score": 52.21, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 581.0, "distress_signals": [], "ai_analysis": null, "lat": 38.344849, "lng": -122.3179735, "url": null}, {"id": 91, "address": "3336 Brittany Cir", "city": "Napa", "county": null, "zip": "94558", "price": 1130000, "beds": 3, "baths": 2.0, "sqft": 1649, "lot_sqft": 10485, "year_built": 1989, "dom": 120, "score": 51.97, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 685.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3131979, "lng": -122.3293277, "url": null}, {"id": 92, "address": "3344 Linda Mesa Way", "city": "Napa", "county": null, "zip": "94558", "price": 1595000, "beds": 4, "baths": 3.0, "sqft": 2290, "lot_sqft": 60644, "year_built": 1995, "dom": 133, "score": 50.72, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 697.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3108063, "lng": -122.3347957, "url": null}, {"id": 93, "address": "3 Lerner Dr", "city": "Calistoga", "county": null, "zip": "94515", "price": 1790000, "beds": 4, "baths": 5.5, "sqft": 4069, "lot_sqft": 11096, "year_built": 1991, "dom": 68, "score": 50.41, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 440.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5769488, "lng": -122.5869707, "url": null}, {"id": 94, "address": "1325 Calistoga Ave", "city": "Napa", "county": null, "zip": "94559", "price": 899000, "beds": 3, "baths": 2.0, "sqft": 1388, "lot_sqft": 3254, "year_built": 1898, "dom": 93, "score": 50.2, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 648.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2993571, "lng": -122.2897049, "url": null}, {"id": 95, "address": "3062 Soda Canyon Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1499000, "beds": 5, "baths": 4.0, "sqft": 3396, "lot_sqft": 115870, "year_built": 1982, "dom": 1, "score": 50.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 441.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4306943, "lng": -122.3008041, "url": null}, {"id": 96, "address": "4870 Dry Creek Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1600000, "beds": 3, "baths": 2.0, "sqft": 3007, "lot_sqft": 392040, "year_built": 1990, "dom": 11, "score": 50.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 532.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3686937, "lng": -122.3772088, "url": null}, {"id": 97, "address": "1263 Buhman Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1949000, "beds": 3, "baths": 3.5, "sqft": 2763, "lot_sqft": 65340, "year_built": 1999, "dom": 452, "score": 49.89, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 705.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2989902, "lng": -122.3423012, "url": null}, {"id": 98, "address": "2237 Vandeleur Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1429000, "beds": 3, "baths": 3.0, "sqft": 2586, "lot_sqft": 6359, "year_built": 2026, "dom": 114, "score": 49.84, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 553.0, "distress_signals": [], "ai_analysis": null, "lat": 38.329115, "lng": -122.298749, "url": null}, {"id": 99, "address": "256 Rosebud Ln", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1190000, "beds": 4, "baths": 3.0, "sqft": 2264, "lot_sqft": 5410, "year_built": 2013, "dom": 274, "score": 49.56, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 526.0, "distress_signals": [], "ai_analysis": null, "lat": 38.494411, "lng": -122.4581198, "url": null}, {"id": 100, "address": "1328 Monte Vista Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1650000, "beds": 8, "baths": 8.0, "sqft": 2400, "lot_sqft": 10711, "year_built": 1985, "dom": 144, "score": 49.51, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 688.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5094498, "lng": -122.4654078, "url": null}, {"id": 101, "address": "460 Bella Vista Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1295000, "beds": 5, "baths": 3.0, "sqft": 2106, "lot_sqft": 105415, "year_built": 1967, "dom": 21, "score": 49.25, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 615.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5591482, "lng": -122.4503738, "url": null}, {"id": 102, "address": "1143 Hudson Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1250000, "beds": 3, "baths": 2.0, "sqft": 1759, "lot_sqft": 6534, "year_built": 1956, "dom": 138, "score": 49.12, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 711.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4968009, "lng": -122.47158, "url": null}, {"id": 103, "address": "1335 E St", "city": "Napa", "county": null, "zip": "94559", "price": 768000, "beds": 3, "baths": 2.0, "sqft": 1322, "lot_sqft": 5358, "year_built": 1936, "dom": 12, "score": 49.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 581.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3043357, "lng": -122.2953164, "url": null}, {"id": 104, "address": "837 Erin Way", "city": "Napa", "county": null, "zip": "94559", "price": 1199000, "beds": 4, "baths": 3.0, "sqft": 2256, "lot_sqft": 5005, "year_built": 2015, "dom": 96, "score": 48.87, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 531.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2906704, "lng": -122.2730346, "url": null}, {"id": 105, "address": "3263 Atherton Cir", "city": "Napa", "county": null, "zip": "94558", "price": 1379000, "beds": 5, "baths": 4.0, "sqft": 2917, "lot_sqft": 6347, "year_built": 2013, "dom": 96, "score": 48.7, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 473.0, "distress_signals": [], "ai_analysis": null, "lat": 38.310519, "lng": -122.3302706, "url": null}, {"id": 106, "address": "1740 Milton Rd", "city": "Napa", "county": null, "zip": "94559", "price": 998000, "beds": 4, "baths": 3.0, "sqft": 2016, "lot_sqft": 6299, "year_built": 1967, "dom": 34, "score": 48.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 495.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2015706, "lng": -122.3136251, "url": null}, {"id": 107, "address": "75 Parkview Ct", "city": "American Canyon", "county": null, "zip": "94503", "price": 779999, "beds": 4, "baths": 3.0, "sqft": 1941, "lot_sqft": 8947, "year_built": 1990, "dom": 7, "score": 48.44, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 402.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1697328, "lng": -122.2652482, "url": null}, {"id": 108, "address": "125 Valley Club Cir", "city": "Napa", "county": null, "zip": "94558", "price": 1135000, "beds": 3, "baths": 3.0, "sqft": 1983, "lot_sqft": 2291, "year_built": 1990, "dom": 158, "score": 48.35, "tier": "Monitor", "property_type": "Condo/Co-op", "price_per_sqft": 572.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3317199, "lng": -122.2957572, "url": null}, {"id": 109, "address": "1114 Mount George Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1735000, "beds": 4, "baths": 3.0, "sqft": 2410, "lot_sqft": 144619, "year_built": 1982, "dom": 190, "score": 48.32, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 720.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3334904, "lng": -122.2345619, "url": null}, {"id": 110, "address": "2025 W Myrtle St", "city": "Calistoga", "county": null, "zip": "94515", "price": 950000, "beds": 3, "baths": 2.5, "sqft": 1681, "lot_sqft": 5323, "year_built": 1988, "dom": 54, "score": 48.12, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 565.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5793518, "lng": -122.5910767, "url": null}, {"id": 111, "address": "5809 Sharp Rd", "city": "Calistoga", "county": null, "zip": "94515", "price": 1490000, "beds": 3, "baths": 2.0, "sqft": 2056, "lot_sqft": 96703, "year_built": 1977, "dom": 144, "score": 47.8, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 725.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5585622, "lng": -122.6133121, "url": null}, {"id": 112, "address": "1133 Stanford Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1550000, "beds": 4, "baths": 3.5, "sqft": 2658, "lot_sqft": 34669, "year_built": 1988, "dom": 30, "score": 47.58, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 583.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3144714, "lng": -122.3466789, "url": null}, {"id": 113, "address": "3335 Friesen Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1790000, "beds": 4, "baths": 4.0, "sqft": 3994, "lot_sqft": 871200, "year_built": 2009, "dom": 40, "score": 47.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 448.0, "distress_signals": [], "ai_analysis": null, "lat": 38.599277, "lng": -122.48301, "url": null}, {"id": 114, "address": "2049 W F St", "city": "Napa", "county": null, "zip": "94558", "price": 1125000, "beds": 3, "baths": 2.5, "sqft": 1669, "lot_sqft": 12828, "year_built": 1958, "dom": 46, "score": 47.11, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 674.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3032872, "lng": -122.3071422, "url": null}, {"id": 115, "address": "1705 Fair Way", "city": "Calistoga", "county": null, "zip": "94515", "price": 1195000, "beds": 3, "baths": 2.0, "sqft": 1705, "lot_sqft": 10724, "year_built": 1974, "dom": 55, "score": 46.55, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 701.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5826158, "lng": -122.5830308, "url": null}, {"id": 116, "address": "960 Capitola Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1298000, "beds": 4, "baths": 2.5, "sqft": 3177, "lot_sqft": 7336, "year_built": 2007, "dom": 79, "score": 46.49, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 409.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2945099, "lng": -122.2724206, "url": null}, {"id": 117, "address": "186 S Seymour St", "city": "Napa", "county": null, "zip": "94559", "price": 1495000, "beds": 3, "baths": 2.5, "sqft": 1900, "lot_sqft": 9448, "year_built": 1950, "dom": 152, "score": 46.24, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 787.0, "distress_signals": [], "ai_analysis": null, "lat": 38.286458, "lng": -122.297454, "url": null}, {"id": 118, "address": "2991 Applewood Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1074500, "beds": 4, "baths": 2.5, "sqft": 2516, "lot_sqft": 7018, "year_built": 1973, "dom": 23, "score": 46.16, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 427.0, "distress_signals": [], "ai_analysis": null, "lat": 38.315885, "lng": -122.3262154, "url": null}, {"id": 119, "address": "1451 Gordon Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1249000, "beds": 5, "baths": 3.0, "sqft": 2835, "lot_sqft": 6264, "year_built": 1995, "dom": 59, "score": 46.09, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 441.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3390541, "lng": -122.313768, "url": null}, {"id": 120, "address": "4336 Plass Dr", "city": "Napa", "county": null, "zip": "94558", "price": 988000, "beds": 3, "baths": 2.0, "sqft": 1658, "lot_sqft": 5998, "year_built": 1967, "dom": 29, "score": 45.7, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 596.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3407322, "lng": -122.3165965, "url": null}, {"id": 121, "address": "60 Wild Rye Way", "city": "Napa", "county": null, "zip": "94558", "price": 847000, "beds": 3, "baths": 2.5, "sqft": 1713, "lot_sqft": 4844, "year_built": 1999, "dom": 47, "score": 45.56, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 494.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3280968, "lng": -122.2994792, "url": null}, {"id": 122, "address": "3207 Swiss Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1790000, "beds": 4, "baths": 2.5, "sqft": 2396, "lot_sqft": 20830, "year_built": 1984, "dom": 128, "score": 45.52, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 747.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2944312, "lng": -122.3414662, "url": null}, {"id": 123, "address": "4440 Tanglewood Way", "city": "Napa", "county": null, "zip": "94558", "price": 850000, "beds": 3, "baths": 2.0, "sqft": 1313, "lot_sqft": 6425, "year_built": 1970, "dom": 4, "score": 45.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 647.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3436506, "lng": -122.3192159, "url": null}, {"id": 124, "address": "3402 Twin Oaks Dr", "city": "Napa", "county": null, "zip": "94558", "price": 875000, "beds": 3, "baths": 2.0, "sqft": 1684, "lot_sqft": 6473, "year_built": 1976, "dom": 1, "score": 45.38, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 520.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3025678, "lng": -122.3388574, "url": null}, {"id": 125, "address": "3144 Mount Veeder Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1395000, "beds": 3, "baths": 3.0, "sqft": 1863, "lot_sqft": 88427, "year_built": 2001, "dom": 275, "score": 45.31, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 749.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3759982, "lng": -122.4219391, "url": null}, {"id": 126, "address": "6486 Dry Creek Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1100000, "beds": 3, "baths": 2.0, "sqft": 1814, "lot_sqft": 217800, "year_built": 1977, "dom": 18, "score": 45.19, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 606.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4094274, "lng": -122.4626472, "url": null}, {"id": 127, "address": "309 Canyon Estates Cir", "city": "American Canyon", "county": null, "zip": "94503", "price": 1845950, "beds": 4, "baths": 3.5, "sqft": 4440, "lot_sqft": 20000, "year_built": 2026, "dom": 38, "score": 45.02, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 416.0, "distress_signals": [], "ai_analysis": null, "lat": 38.176288, "lng": -122.240713, "url": null}, {"id": 128, "address": "1070 Steele Canyon Rd", "city": "Napa", "county": null, "zip": "94558", "price": 899000, "beds": 4, "baths": 3.0, "sqft": 3018, "lot_sqft": 831996, "year_built": 0, "dom": 9, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 298.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5191957, "lng": -122.1823433, "url": null}, {"id": 129, "address": "5274 Silverado Trl", "city": "Napa", "county": null, "zip": "94558", "price": 975000, "beds": 5, "baths": 5.0, "sqft": 5173, "lot_sqft": 65340, "year_built": 2021, "dom": 13, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 188.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3811508, "lng": -122.3064128, "url": null}, {"id": 130, "address": "2610 Atlas Peak Rd #2", "city": "Napa", "county": null, "zip": "94558", "price": 824000, "beds": 4, "baths": 4.0, "sqft": 3914, "lot_sqft": 1364299, "year_built": 2016, "dom": 25, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 211.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3701229, "lng": -122.2471539, "url": null}, {"id": 131, "address": "1350 Wooden Valley Rd", "city": "Napa", "county": null, "zip": "94558", "price": 975000, "beds": 3, "baths": 2.0, "sqft": 1850, "lot_sqft": 0, "year_built": 1982, "dom": 110, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 527.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3775921, "lng": -122.1853142, "url": null}, {"id": 132, "address": "4405 Silverado Trl", "city": "Calistoga", "county": null, "zip": "94515", "price": 1799000, "beds": 4, "baths": 2.5, "sqft": 1292, "lot_sqft": 51401, "year_built": 1954, "dom": 124, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 1392.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5760832, "lng": -122.5355144, "url": null}, {"id": 133, "address": "2180 Patton Ave", "city": "Napa", "county": null, "zip": "94559", "price": 1999000, "beds": 4, "baths": 4.0, "sqft": 2195, "lot_sqft": 45041, "year_built": 1961, "dom": 126, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 911.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2808565, "lng": -122.2562835, "url": null}, {"id": 134, "address": "2188 Patton Ave", "city": "Napa", "county": null, "zip": "94559", "price": 1149000, "beds": 3, "baths": 2.0, "sqft": 1226, "lot_sqft": 15290, "year_built": 1955, "dom": 137, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 937.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2805417, "lng": -122.2567514, "url": null}, {"id": 135, "address": "2192 1st Ave", "city": "Napa", "county": null, "zip": "94558", "price": 899000, "beds": 3, "baths": 1.0, "sqft": 1001, "lot_sqft": 15200, "year_built": 1940, "dom": 149, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 898.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3133354, "lng": -122.2562465, "url": null}, {"id": 136, "address": "1301 Duhig Rd", "city": "Napa", "county": null, "zip": "94559", "price": 1780000, "beds": 3, "baths": 2.0, "sqft": 1933, "lot_sqft": 435600, "year_built": 1971, "dom": 227, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 921.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2480579, "lng": -122.3575485, "url": null}, {"id": 137, "address": "5370 Country Ln", "city": "Napa", "county": null, "zip": "94558", "price": 1850000, "beds": 3, "baths": 2.0, "sqft": 2148, "lot_sqft": 473933, "year_built": 1951, "dom": 417, "score": 45.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 861.0, "distress_signals": [], "ai_analysis": null, "lat": 38.301702, "lng": -122.2198132, "url": null}, {"id": 138, "address": "1701 N Oak St", "city": "Calistoga", "county": null, "zip": "94515", "price": 1100000, "beds": 3, "baths": 2.0, "sqft": 1519, "lot_sqft": 7192, "year_built": 1960, "dom": 62, "score": 44.85, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 724.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5859798, "lng": -122.5829979, "url": null}, {"id": 139, "address": "55 Catania Ln", "city": "Napa", "county": null, "zip": "94558", "price": 1499000, "beds": 3, "baths": 2.5, "sqft": 2484, "lot_sqft": 5693, "year_built": 2007, "dom": 95, "score": 44.67, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 603.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3269503, "lng": -122.2908651, "url": null}, {"id": 140, "address": "28 S Newport Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1669000, "beds": 5, "baths": 3.0, "sqft": 2573, "lot_sqft": 5667, "year_built": 1992, "dom": 244, "score": 44.52, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 649.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2751736, "lng": -122.2873011, "url": null}, {"id": 141, "address": "151 High St", "city": "Calistoga", "county": null, "zip": "94515", "price": 965000, "beds": 3, "baths": 2.0, "sqft": 1275, "lot_sqft": 11700, "year_built": 1986, "dom": 127, "score": 44.47, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 757.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5782788, "lng": -122.5899513, "url": null}, {"id": 142, "address": "343 Cordelia Dr", "city": "Napa", "county": null, "zip": "94558", "price": 919990, "beds": 5, "baths": 4.5, "sqft": 2827, "lot_sqft": 3049, "year_built": 2025, "dom": 209, "score": 44.31, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 325.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25430679321289, "lng": -122.27864837646484, "url": null}, {"id": 143, "address": "6 Palestrina Ct", "city": "American Canyon", "county": null, "zip": "94503", "price": 850000, "beds": 4, "baths": 3.0, "sqft": 2921, "lot_sqft": 7845, "year_built": 2004, "dom": 44, "score": 44.24, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 291.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1554052, "lng": -122.2318811, "url": null}, {"id": 144, "address": "2 Blue Elder Ct", "city": "American Canyon", "county": null, "zip": "94503", "price": 899000, "beds": 4, "baths": 2.5, "sqft": 2691, "lot_sqft": 9527, "year_built": 2003, "dom": 3, "score": 44.16, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 334.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1736451, "lng": -122.2692559, "url": null}, {"id": 145, "address": "3955 E Highway 128 Hwy", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1099000, "beds": 3, "baths": 3.0, "sqft": 1487, "lot_sqft": 1792930, "year_built": 1987, "dom": 81, "score": 44.1, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 739.0, "distress_signals": [], "ai_analysis": null, "lat": 38.498676, "lng": -122.2576454, "url": null}, {"id": 146, "address": "301 Canyon Estates Cir", "city": "American Canyon", "county": null, "zip": "94503", "price": 1945239, "beds": 6, "baths": 5.5, "sqft": 4714, "lot_sqft": 20000, "year_built": 2026, "dom": 38, "score": 43.97, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 413.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1760731, "lng": -122.2409197, "url": null}, {"id": 147, "address": "2207 Vandeleur Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1299575, "beds": 4, "baths": 3.0, "sqft": 2533, "lot_sqft": 4887, "year_built": 2026, "dom": 75, "score": 43.97, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 513.0, "distress_signals": [], "ai_analysis": null, "lat": 38.328707, "lng": -122.299559, "url": null}, {"id": 148, "address": "2129 Euclid Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1149000, "beds": 3, "baths": 2.0, "sqft": 1738, "lot_sqft": 8420, "year_built": 1953, "dom": 12, "score": 43.84, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 661.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3097621, "lng": -122.3101649, "url": null}, {"id": 149, "address": "1986 Walden Ln", "city": "Napa", "county": null, "zip": "94558", "price": 1799500, "beds": 5, "baths": 4.5, "sqft": 3734, "lot_sqft": 8263, "year_built": 2009, "dom": 67, "score": 43.1, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 482.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3030207, "lng": -122.3075836, "url": null}, {"id": 150, "address": "90 S Newport Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1550000, "beds": 4, "baths": 2.5, "sqft": 2339, "lot_sqft": 5110, "year_built": 1996, "dom": 400, "score": 43.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 663.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2752302, "lng": -122.2900768, "url": null}, {"id": 151, "address": "1027 Vassar Dr", "city": "Napa", "county": null, "zip": "94558", "price": 975000, "beds": 3, "baths": 2.0, "sqft": 1366, "lot_sqft": 10903, "year_built": 1957, "dom": 46, "score": 42.95, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 714.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3102069, "lng": -122.3445051, "url": null}, {"id": 152, "address": "139 Wingard Cir", "city": "Napa", "county": null, "zip": "94558", "price": 849000, "beds": 3, "baths": 2.5, "sqft": 1551, "lot_sqft": 4861, "year_built": 2000, "dom": 5, "score": 42.54, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 547.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3335337, "lng": -122.3234011, "url": null}, {"id": 153, "address": "4405 Lake County Hwy", "city": "Calistoga", "county": null, "zip": "94515", "price": 999000, "beds": 3, "baths": 2.0, "sqft": 1288, "lot_sqft": 44876, "year_built": 1985, "dom": 153, "score": 42.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 776.0, "distress_signals": [], "ai_analysis": null, "lat": 38.6436914, "lng": -122.5939325, "url": null}, {"id": 154, "address": "1 Emperor Way", "city": "Napa", "county": null, "zip": "94558", "price": 1435000, "beds": 4, "baths": 3.0, "sqft": 3253, "lot_sqft": 7937, "year_built": 1998, "dom": 39, "score": 42.01, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 441.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3342939, "lng": -122.3276131, "url": null}, {"id": 155, "address": "1550 Yountville Cross Rd", "city": "Yountville", "county": null, "zip": "94599", "price": 1900000, "beds": 3, "baths": 2.5, "sqft": 2233, "lot_sqft": 19750, "year_built": 1970, "dom": 76, "score": 41.5, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 851.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4271455, "lng": -122.342352, "url": null}, {"id": 156, "address": "539 - 543 Randolph St", "city": "Napa", "county": null, "zip": "94559", "price": 1099000, "beds": 4, "baths": 2.0, "sqft": 1705, "lot_sqft": 6369, "year_built": 1933, "dom": 23, "score": 41.07, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 645.0, "distress_signals": [], "ai_analysis": null, "lat": 38.294403, "lng": -122.2862313, "url": null}, {"id": 157, "address": "3461 Ruston Ln", "city": "Napa", "county": null, "zip": "94558", "price": 1650000, "beds": 4, "baths": 3.0, "sqft": 2965, "lot_sqft": 7253, "year_built": 2026, "dom": 53, "score": 40.53, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 556.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3196121, "lng": -122.3258919, "url": null}, {"id": 158, "address": "1005 - 1015 Little St", "city": "Napa", "county": null, "zip": "94558", "price": 1395000, "beds": 5, "baths": 2.0, "sqft": 1712, "lot_sqft": 25792, "year_built": 1947, "dom": 72, "score": 40.5, "tier": "Monitor", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 815.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2966152, "lng": -122.2680908, "url": null}, {"id": 159, "address": "1776 Partrick Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1695000, "beds": 4, "baths": 3.0, "sqft": 2535, "lot_sqft": 71874, "year_built": 1976, "dom": 37, "score": 40.38, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 669.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3171003, "lng": -122.3779013, "url": null}, {"id": 160, "address": "1403 B", "city": "Napa", "county": null, "zip": "94559", "price": 1288000, "beds": 4, "baths": 3.0, "sqft": 1296, "lot_sqft": 7464, "year_built": 1900, "dom": 71, "score": 40.25, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 994.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3018352, "lng": -122.295135, "url": null}, {"id": 161, "address": "572 Montecito Blvd", "city": "Napa", "county": null, "zip": "94559", "price": 1995000, "beds": 3, "baths": 3.0, "sqft": 2432, "lot_sqft": 27569, "year_built": 1978, "dom": 104, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 820.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3038462, "lng": -122.2633586, "url": null}, {"id": 162, "address": "8000 Wild Horse Valley Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1900000, "beds": 3, "baths": 2.0, "sqft": 1456, "lot_sqft": 6520932, "year_built": 1990, "dom": 397, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 1305.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3237301, "lng": -122.1993685, "url": null}, {"id": 163, "address": "1065 Summit Lake Dr", "city": "Angwin", "county": null, "zip": "94508", "price": 1995000, "beds": 3, "baths": 2.0, "sqft": 2094, "lot_sqft": 56192, "year_built": 1978, "dom": 454, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 953.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5928601, "lng": -122.4472415, "url": null}, {"id": 164, "address": "455 Glass Mountain Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1695000, "beds": 3, "baths": 2.0, "sqft": 1530, "lot_sqft": 44867, "year_built": 1980, "dom": 484, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 1108.0, "distress_signals": [], "ai_analysis": null, "lat": 38.535717, "lng": -122.4766486, "url": null}, {"id": 165, "address": "173 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 759990, "beds": 4, "baths": 3.0, "sqft": 2130, "lot_sqft": 0, "year_built": 2026, "dom": 102, "score": 40.0, "tier": "Monitor", "property_type": "Townhouse", "price_per_sqft": 357.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25574493408203, "lng": -122.27747344970703, "url": null}, {"id": 166, "address": "187 Splittail Way", "city": "Napa", "county": null, "zip": "94558", "price": 879167, "beds": 4, "baths": 3.5, "sqft": 2311, "lot_sqft": 0, "year_built": 2026, "dom": 139, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 380.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2556638, "lng": -122.2780229, "url": null}, {"id": 167, "address": "168 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 929990, "beds": 4, "baths": 3.5, "sqft": 2661, "lot_sqft": 0, "year_built": 2025, "dom": 221, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 349.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25591278076172, "lng": -122.27774047851562, "url": null}, {"id": 168, "address": "181 Splittail Way", "city": "Napa", "county": null, "zip": "94558", "price": 929990, "beds": 4, "baths": 3.5, "sqft": 2661, "lot_sqft": 0, "year_built": 2025, "dom": 221, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 349.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2557872, "lng": -122.2780246, "url": null}, {"id": 169, "address": "355 Cordelia Dr", "city": "Napa", "county": null, "zip": "94558", "price": 947231, "beds": 4, "baths": 3.0, "sqft": 2559, "lot_sqft": 0, "year_built": 2025, "dom": 309, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 370.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25429153442383, "lng": -122.2790756225586, "url": null}, {"id": 170, "address": "337 Currant Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1051616, "beds": 5, "baths": 4.5, "sqft": 3173, "lot_sqft": 0, "year_built": 2025, "dom": 316, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 331.0, "distress_signals": [], "ai_analysis": null, "lat": 38.254021, "lng": -122.278387, "url": null}, {"id": 171, "address": "349 Currant Dr", "city": "Napa", "county": null, "zip": "94558", "price": 979990, "beds": 5, "baths": 4.5, "sqft": 3173, "lot_sqft": 0, "year_built": 2025, "dom": 317, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 309.0, "distress_signals": [], "ai_analysis": null, "lat": 38.254021, "lng": -122.278774, "url": null}, {"id": 172, "address": "361 Currant Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1087276, "beds": 5, "baths": 4.5, "sqft": 3173, "lot_sqft": 0, "year_built": 2025, "dom": 317, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 343.0, "distress_signals": [], "ai_analysis": null, "lat": 38.254021, "lng": -122.27917, "url": null}, {"id": 173, "address": "Plan 2446 Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 797990, "beds": 4, "baths": 3.0, "sqft": 2446, "lot_sqft": 0, "year_built": 0, "dom": 173, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 326.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1830655, "lng": -122.248277, "url": null}, {"id": 174, "address": "Residence 2 Plan", "city": "Napa", "county": null, "zip": "94558", "price": 849990, "beds": 4, "baths": 3.5, "sqft": 2311, "lot_sqft": 0, "year_built": 0, "dom": 430, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 368.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25586700439453, "lng": -122.27899169921875, "url": null}, {"id": 175, "address": "Residence 4 Plan", "city": "Napa", "county": null, "zip": "94558", "price": 759990, "beds": 4, "baths": 3.0, "sqft": 2130, "lot_sqft": 0, "year_built": 0, "dom": 433, "score": 40.0, "tier": "Monitor", "property_type": "Townhouse", "price_per_sqft": 357.0, "distress_signals": [], "ai_analysis": null, "lat": 38.255815, "lng": -122.279029, "url": null}, {"id": 176, "address": "Residence Four Plan", "city": "Napa", "county": null, "zip": "94558", "price": 1417000, "beds": 4, "baths": 4.0, "sqft": 2859, "lot_sqft": 0, "year_built": 0, "dom": 454, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 496.0, "distress_signals": [], "ai_analysis": null, "lat": 38.32981872558594, "lng": -122.29898071289062, "url": null}, {"id": 177, "address": "Residence 3 Plan", "city": "Napa", "county": null, "zip": "94558", "price": 929990, "beds": 4, "baths": 3.5, "sqft": 2661, "lot_sqft": 0, "year_built": 0, "dom": 526, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 349.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25586700439453, "lng": -122.27899169921875, "url": null}, {"id": 178, "address": "Residence 1 Plan", "city": "Napa", "county": null, "zip": "94558", "price": 838240, "beds": 4, "baths": 3.0, "sqft": 2340, "lot_sqft": 0, "year_built": 0, "dom": 806, "score": 40.0, "tier": "Monitor", "property_type": "Single Family Residential", "price_per_sqft": 358.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25586700439453, "lng": -122.27899169921875, "url": null}, {"id": 179, "address": "1291 Sylvaner Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1595000, "beds": 3, "baths": 2.0, "sqft": 1511, "lot_sqft": 8124, "year_built": 1970, "dom": 69, "score": 39.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1056.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4952107, "lng": -122.476566, "url": null}, {"id": 180, "address": "421 Bettona Way", "city": "American Canyon", "county": null, "zip": "94503", "price": 914500, "beds": 5, "baths": 4.5, "sqft": 3575, "lot_sqft": 6538, "year_built": 2002, "dom": 38, "score": 39.32, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 256.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1652867, "lng": -122.2663477, "url": null}, {"id": 181, "address": "124 Old Vine Way", "city": "Napa", "county": null, "zip": "94558", "price": 1295000, "beds": 4, "baths": 3.0, "sqft": 2074, "lot_sqft": 7105, "year_built": 2017, "dom": 59, "score": 39.27, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 624.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3331669, "lng": -122.2979069, "url": null}, {"id": 182, "address": "324 Pear Tree Ter Unit D", "city": "Napa", "county": null, "zip": "94558", "price": 884500, "beds": 3, "baths": 2.5, "sqft": 1843, "lot_sqft": 1263, "year_built": 2021, "dom": 87, "score": 39.25, "tier": "Pass", "property_type": "Condo/Co-op", "price_per_sqft": 480.0, "distress_signals": [], "ai_analysis": null, "lat": 38.321239, "lng": -122.290289, "url": null}, {"id": 183, "address": "1726 Crinella Dr", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1190000, "beds": 3, "baths": 2.0, "sqft": 1350, "lot_sqft": 5611, "year_built": 1964, "dom": 80, "score": 39.13, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 881.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5100328, "lng": -122.4735144, "url": null}, {"id": 184, "address": "2539 Rollingwood Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1149000, "beds": 3, "baths": 2.0, "sqft": 1441, "lot_sqft": 8943, "year_built": 1967, "dom": 64, "score": 38.81, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 797.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3117185, "lng": -122.322947, "url": null}, {"id": 185, "address": "945 Brown St", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1595000, "beds": 3, "baths": 2.0, "sqft": 1733, "lot_sqft": 5876, "year_built": 1940, "dom": 146, "score": 38.56, "tier": "Pass", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 920.0, "distress_signals": [], "ai_analysis": null, "lat": 38.50369, "lng": -122.4630448, "url": null}, {"id": 186, "address": "31 Haven Way", "city": "Napa", "county": null, "zip": "94558", "price": 1595000, "beds": 5, "baths": 3.0, "sqft": 3365, "lot_sqft": 6434, "year_built": 2004, "dom": 33, "score": 38.4, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 474.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3447659, "lng": -122.32978, "url": null}, {"id": 187, "address": "4430 Summerfield Dr", "city": "Napa", "county": null, "zip": "94558", "price": 899000, "beds": 3, "baths": 2.0, "sqft": 1186, "lot_sqft": 9648, "year_built": 1973, "dom": 46, "score": 38.37, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 758.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3459348, "lng": -122.3146179, "url": null}, {"id": 188, "address": "131 Coombs St", "city": "Napa", "county": null, "zip": "94559", "price": 1000000, "beds": 10, "baths": 4.0, "sqft": 1600, "lot_sqft": 14170, "year_built": 0, "dom": 6, "score": 38.21, "tier": "Pass", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 625.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2880656, "lng": -122.2872511, "url": null}, {"id": 189, "address": "30 Montecito Blvd", "city": "Napa", "county": null, "zip": "94559", "price": 1515000, "beds": 4, "baths": 3.0, "sqft": 2510, "lot_sqft": 0, "year_built": 1964, "dom": 60, "score": 37.9, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 604.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3017296, "lng": -122.2711493, "url": null}, {"id": 190, "address": "239 Saffron Ct", "city": "Napa", "county": null, "zip": "94559", "price": 1225000, "beds": 3, "baths": 2.0, "sqft": 2265, "lot_sqft": 7266, "year_built": 2014, "dom": 26, "score": 37.83, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 541.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2910838, "lng": -122.2689808, "url": null}, {"id": 191, "address": "2 Ford Dr", "city": "American Canyon", "county": null, "zip": "94503", "price": 1125000, "beds": 6, "baths": 3.0, "sqft": 3862, "lot_sqft": 7301, "year_built": 2003, "dom": 22, "score": 37.56, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 291.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1591855, "lng": -122.24504, "url": null}, {"id": 192, "address": "528 Wetlands Edge Rd", "city": "American Canyon", "county": null, "zip": "94503", "price": 1110000, "beds": 4, "baths": 3.0, "sqft": 3000, "lot_sqft": 0, "year_built": 2004, "dom": 59, "score": 37.25, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 370.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1787808, "lng": -122.271292, "url": null}, {"id": 193, "address": "1121 Valley View St", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1249000, "beds": 3, "baths": 2.0, "sqft": 1270, "lot_sqft": 6734, "year_built": 1965, "dom": 57, "score": 36.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 983.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4955863, "lng": -122.473164, "url": null}, {"id": 194, "address": "1830 Spring Mountain Rd", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1698000, "beds": 3, "baths": 2.0, "sqft": 1645, "lot_sqft": 6813, "year_built": 1978, "dom": 179, "score": 36.57, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1032.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5063504, "lng": -122.4790752, "url": null}, {"id": 195, "address": "1039 Birkdale Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1395000, "beds": 4, "baths": 2.5, "sqft": 3076, "lot_sqft": 8725, "year_built": 2011, "dom": 12, "score": 36.35, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 454.0, "distress_signals": [], "ai_analysis": null, "lat": 38.29263, "lng": -122.2677344, "url": null}, {"id": 196, "address": "5083 Dry Creek Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1295000, "beds": 7, "baths": 2.0, "sqft": 1872, "lot_sqft": 2273832, "year_built": 1989, "dom": 26, "score": 36.24, "tier": "Pass", "property_type": "Multi-Family (2-4 Unit)", "price_per_sqft": 692.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3745489, "lng": -122.3903257, "url": null}, {"id": 197, "address": "3294 Vichy Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1650000, "beds": 3, "baths": 3.0, "sqft": 2165, "lot_sqft": 43560, "year_built": 1965, "dom": 39, "score": 36.2, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 762.0, "distress_signals": [], "ai_analysis": null, "lat": 38.336596, "lng": -122.2575443, "url": null}, {"id": 198, "address": "49 Wine Press Way", "city": "Napa", "county": null, "zip": "94558", "price": 1295000, "beds": 3, "baths": 2.5, "sqft": 2115, "lot_sqft": 6111, "year_built": 1995, "dom": 2, "score": 36.12, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 612.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3314027, "lng": -122.3305504, "url": null}, {"id": 199, "address": "109 Glass Mountain Ln", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1798000, "beds": 3, "baths": 2.5, "sqft": 2423, "lot_sqft": 80150, "year_built": 1951, "dom": 12, "score": 36.04, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 742.0, "distress_signals": [], "ai_analysis": null, "lat": 38.536492, "lng": -122.47907, "url": null}, {"id": 200, "address": "2131 1st Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1349000, "beds": 3, "baths": 2.0, "sqft": 1279, "lot_sqft": 111514, "year_built": 1942, "dom": 54, "score": 36.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1055.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3107284, "lng": -122.2565589, "url": null}, {"id": 201, "address": "2004 Oak Cir", "city": "Yountville", "county": null, "zip": "94599", "price": 1695000, "beds": 3, "baths": 2.0, "sqft": 1918, "lot_sqft": 7627, "year_built": 1989, "dom": 160, "score": 35.91, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 884.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4001523, "lng": -122.3582565, "url": null}, {"id": 202, "address": "", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1975000, "beds": 4, "baths": 4.0, "sqft": 2682, "lot_sqft": 557568, "year_built": 1977, "dom": 45, "score": 35.41, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 736.0, "distress_signals": [], "ai_analysis": null, "lat": 38.6077563, "lng": -122.4084233, "url": null}, {"id": 203, "address": "180 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 973473, "beds": 4, "baths": 3.5, "sqft": 2661, "lot_sqft": 0, "year_built": 2026, "dom": 71, "score": 35.25, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 366.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25548553466797, "lng": -122.27776336669922, "url": null}, {"id": 204, "address": "66 S Newport Dr", "city": "Napa", "county": null, "zip": "94559", "price": 1595000, "beds": 4, "baths": 2.5, "sqft": 2129, "lot_sqft": 5171, "year_built": 1995, "dom": 103, "score": 35.02, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 749.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2751631, "lng": -122.2890211, "url": null}, {"id": 205, "address": "303 Flagship Dr", "city": "Napa", "county": null, "zip": "94558", "price": 880000, "beds": 4, "baths": 3.0, "sqft": 2354, "lot_sqft": 3237, "year_built": 2024, "dom": 46, "score": 34.5, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 374.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2553568, "lng": -122.2783803, "url": null}, {"id": 206, "address": "2201 Vandeleur Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1295500, "beds": 4, "baths": 3.0, "sqft": 2533, "lot_sqft": 5997, "year_built": 2026, "dom": 26, "score": 34.47, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 511.0, "distress_signals": [], "ai_analysis": null, "lat": 38.328666, "lng": -122.299749, "url": null}, {"id": 207, "address": "3392 Royal Ct", "city": "Napa", "county": null, "zip": "94558", "price": 1650000, "beds": 4, "baths": 2.0, "sqft": 1981, "lot_sqft": 15560, "year_built": 1978, "dom": 67, "score": 34.25, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 833.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2998315, "lng": -122.3384452, "url": null}, {"id": 208, "address": "86 Black Walnut Ln", "city": "Napa", "county": null, "zip": "94559", "price": 1045000, "beds": 4, "baths": 3.0, "sqft": 2259, "lot_sqft": 5005, "year_built": 2019, "dom": 31, "score": 34.11, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 463.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2804711, "lng": -122.2625221, "url": null}, {"id": 209, "address": "1664 Meek Ave", "city": "Napa", "county": null, "zip": "94559", "price": 1369000, "beds": 3, "baths": 3.5, "sqft": 1974, "lot_sqft": 6299, "year_built": 1968, "dom": 17, "score": 33.79, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 694.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3096331, "lng": -122.2717754, "url": null}, {"id": 210, "address": "1240 Arroyo Sarco Way", "city": "Napa", "county": null, "zip": "94558", "price": 1850000, "beds": 4, "baths": 2.5, "sqft": 2423, "lot_sqft": 24285, "year_built": 1969, "dom": 6, "score": 33.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 764.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3294241, "lng": -122.2586902, "url": null}, {"id": 211, "address": "1220 Partrick Rd", "city": "Napa", "county": null, "zip": "94558", "price": 1200000, "beds": 3, "baths": 2.0, "sqft": 1490, "lot_sqft": 25043, "year_built": 1962, "dom": 45, "score": 33.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 805.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3128029, "lng": -122.3505675, "url": null}, {"id": 212, "address": "33 Peninsula Ct", "city": "Napa", "county": null, "zip": "94559", "price": 1499000, "beds": 3, "baths": 2.5, "sqft": 1934, "lot_sqft": 5371, "year_built": 1990, "dom": 97, "score": 33.71, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 775.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2764296, "lng": -122.2905332, "url": null}, {"id": 213, "address": "1163 Morningside Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1995000, "beds": 4, "baths": 2.5, "sqft": 2561, "lot_sqft": 45511, "year_built": 1986, "dom": 56, "score": 33.69, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 779.0, "distress_signals": [], "ai_analysis": null, "lat": 38.305341, "lng": -122.3517985, "url": null}, {"id": 214, "address": "4465 Moffitt Dr", "city": "Napa", "county": null, "zip": "94558", "price": 847500, "beds": 3, "baths": 2.0, "sqft": 1100, "lot_sqft": 5907, "year_built": 1970, "dom": 16, "score": 33.12, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 770.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3453796, "lng": -122.3200293, "url": null}, {"id": 215, "address": "1756 Milton Rd", "city": "Napa", "county": null, "zip": "94559", "price": 899000, "beds": 3, "baths": 2.0, "sqft": 1188, "lot_sqft": 5223, "year_built": 1955, "dom": 20, "score": 32.06, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 757.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2010523, "lng": -122.3139281, "url": null}, {"id": 216, "address": "1507 Cedar Ave", "city": "Napa", "county": null, "zip": "94559", "price": 1695000, "beds": 3, "baths": 3.0, "sqft": 2170, "lot_sqft": 16932, "year_built": 1970, "dom": 11, "score": 31.98, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 781.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3000751, "lng": -122.2954645, "url": null}, {"id": 217, "address": "186 Cartier St", "city": "American Canyon", "county": null, "zip": "94503", "price": 811990, "beds": 4, "baths": 3.0, "sqft": 2190, "lot_sqft": 3602, "year_built": 0, "dom": 12, "score": 31.58, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 371.0, "distress_signals": [], "ai_analysis": null, "lat": 38.183061, "lng": -122.245623, "url": null}, {"id": 218, "address": "8 Terrace Ct", "city": "American Canyon", "county": null, "zip": "94503", "price": 750990, "beds": 3, "baths": 2.5, "sqft": 2190, "lot_sqft": 3277, "year_built": 0, "dom": 19, "score": 30.99, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 343.0, "distress_signals": [], "ai_analysis": null, "lat": 38.1818804, "lng": -122.2497706, "url": null}, {"id": 219, "address": "221 Ericson Ct", "city": "American Canyon", "county": null, "zip": "94503", "price": 822990, "beds": 4, "baths": 3.0, "sqft": 2446, "lot_sqft": 3198, "year_built": 0, "dom": 33, "score": 30.98, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 336.0, "distress_signals": [], "ai_analysis": null, "lat": 38.182122, "lng": -122.244633, "url": null}, {"id": 220, "address": "3187 Solano Ave", "city": "Napa", "county": null, "zip": "94558", "price": 895000, "beds": 4, "baths": 2.0, "sqft": 1110, "lot_sqft": 13110, "year_built": 1940, "dom": 2, "score": 30.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 806.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3163966, "lng": -122.3080721, "url": null}, {"id": 221, "address": "1170 Mountain View Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1549000, "beds": 4, "baths": 3.0, "sqft": 1632, "lot_sqft": 11548, "year_built": 1954, "dom": 5, "score": 30.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 949.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4867624, "lng": -122.4422668, "url": null}, {"id": 222, "address": "1440 Center St", "city": "Napa", "county": null, "zip": "94559", "price": 999000, "beds": 3, "baths": 1.0, "sqft": 1018, "lot_sqft": 5942, "year_built": 1910, "dom": 22, "score": 30.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 981.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3006458, "lng": -122.2913179, "url": null}, {"id": 223, "address": "908 Marina Dr", "city": "Napa", "county": null, "zip": "94559", "price": 775000, "beds": 3, "baths": 2.5, "sqft": 1803, "lot_sqft": 797, "year_built": 1980, "dom": 24, "score": 30.0, "tier": "Pass", "property_type": "Condo/Co-op", "price_per_sqft": 430.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2799761, "lng": -122.284924, "url": null}, {"id": 224, "address": "187 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 759990, "beds": 3, "baths": 2.5, "sqft": 2026, "lot_sqft": 0, "year_built": 2026, "dom": 49, "score": 29.75, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 375.0, "distress_signals": [], "ai_analysis": null, "lat": 38.25579071044922, "lng": -122.27751159667969, "url": null}, {"id": 225, "address": "188 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 849990, "beds": 4, "baths": 3.5, "sqft": 2311, "lot_sqft": 0, "year_built": 2026, "dom": 49, "score": 29.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 368.0, "distress_signals": [], "ai_analysis": null, "lat": 38.255279541015625, "lng": -122.27772521972656, "url": null}, {"id": 226, "address": "185 Gali Way", "city": "Napa", "county": null, "zip": "94558", "price": 759990, "beds": 4, "baths": 3.0, "sqft": 2141, "lot_sqft": 0, "year_built": 2026, "dom": 49, "score": 29.75, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 355.0, "distress_signals": [], "ai_analysis": null, "lat": 38.255794525146484, "lng": -122.27747344970703, "url": null}, {"id": 227, "address": "1120 Pennyroyal St", "city": "Napa", "county": null, "zip": "94559", "price": 1895000, "beds": 4, "baths": 3.5, "sqft": 2678, "lot_sqft": 14675, "year_built": 2019, "dom": 13, "score": 29.57, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 708.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2926281, "lng": -122.2665357, "url": null}, {"id": 228, "address": "900 Chiles Ave", "city": "Saint Helena", "county": null, "zip": "94574", "price": 915000, "beds": 3, "baths": 2.5, "sqft": 1340, "lot_sqft": 4147, "year_built": 1998, "dom": 9, "score": 29.55, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 683.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5063862, "lng": -122.4660568, "url": null}, {"id": 229, "address": "Paxton Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1835950, "beds": 6, "baths": 6.5, "sqft": 4710, "lot_sqft": 0, "year_built": 0, "dom": 48, "score": 29.5, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 390.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 230, "address": "369 Hideaway Dr", "city": "Napa", "county": null, "zip": "94558", "price": 838240, "beds": 4, "baths": 3.0, "sqft": 2598, "lot_sqft": 2800, "year_built": 2026, "dom": 11, "score": 29.31, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 323.0, "distress_signals": [], "ai_analysis": null, "lat": 38.252899, "lng": -122.278642, "url": null}, {"id": 231, "address": "4627 Lake County Hwy", "city": "Calistoga", "county": null, "zip": "94515", "price": 1265000, "beds": 3, "baths": 2.0, "sqft": 1776, "lot_sqft": 475240, "year_built": 2024, "dom": 4, "score": 29.16, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 712.0, "distress_signals": [], "ai_analysis": null, "lat": 38.6473514, "lng": -122.5964266, "url": null}, {"id": 232, "address": "1866 Oak Cir", "city": "Yountville", "county": null, "zip": "94599", "price": 1575000, "beds": 3, "baths": 2.0, "sqft": 1666, "lot_sqft": 5279, "year_built": 1982, "dom": 74, "score": 28.67, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 945.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4031451, "lng": -122.3548278, "url": null}, {"id": 233, "address": "1435 2nd St", "city": "Calistoga", "county": null, "zip": "94515", "price": 1700000, "beds": 5, "baths": 3.0, "sqft": 1528, "lot_sqft": 6970, "year_built": 1914, "dom": 10, "score": 28.25, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1113.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5807068, "lng": -122.5805783, "url": null}, {"id": 234, "address": "1720 3rd St", "city": "Napa", "county": null, "zip": "94559", "price": 999000, "beds": 3, "baths": 3.5, "sqft": 1484, "lot_sqft": 697, "year_built": 2019, "dom": 100, "score": 28.22, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 673.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2956997, "lng": -122.2919265, "url": null}, {"id": 235, "address": "1739 Park St", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1325000, "beds": 3, "baths": 2.0, "sqft": 1698, "lot_sqft": 6652, "year_built": 1968, "dom": 13, "score": 27.75, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 780.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5092258, "lng": -122.475201, "url": null}, {"id": 236, "address": "4452 Moffitt Dr", "city": "Napa", "county": null, "zip": "94558", "price": 835000, "beds": 4, "baths": 2.0, "sqft": 1324, "lot_sqft": 0, "year_built": 1971, "dom": 12, "score": 27.59, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 631.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3445996, "lng": -122.3199074, "url": null}, {"id": 237, "address": "1703 Crinella Dr", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1285000, "beds": 3, "baths": 3.0, "sqft": 1520, "lot_sqft": 6477, "year_built": 1963, "dom": 12, "score": 27.04, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 845.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5093921, "lng": -122.4735305, "url": null}, {"id": 238, "address": "849 Signorelli Cir", "city": "Saint Helena", "county": null, "zip": "94574", "price": 1400000, "beds": 3, "baths": 2.5, "sqft": 1351, "lot_sqft": 4230, "year_built": 1998, "dom": 68, "score": 27.02, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1036.0, "distress_signals": [], "ai_analysis": null, "lat": 38.5063457, "lng": -122.4645737, "url": null}, {"id": 239, "address": "1620 Spencer St", "city": "Napa", "county": null, "zip": "94559", "price": 995000, "beds": 3, "baths": 2.0, "sqft": 1152, "lot_sqft": 4513, "year_built": 1937, "dom": 11, "score": 25.67, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 864.0, "distress_signals": [], "ai_analysis": null, "lat": 38.3025253, "lng": -122.2949008, "url": null}, {"id": 240, "address": "1716 3rd St", "city": "Napa", "county": null, "zip": "94559", "price": 1029000, "beds": 3, "baths": 3.5, "sqft": 1484, "lot_sqft": 697, "year_built": 2019, "dom": 88, "score": 25.63, "tier": "Pass", "property_type": "Condo/Co-op", "price_per_sqft": 693.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2956938, "lng": -122.291863, "url": null}, {"id": 241, "address": "Harmon Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1845950, "beds": 4, "baths": 3.5, "sqft": 4440, "lot_sqft": 0, "year_built": 0, "dom": 31, "score": 25.25, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 416.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 242, "address": "1111 Hardman Ave", "city": "Napa", "county": null, "zip": "94558", "price": 1995000, "beds": 3, "baths": 2.5, "sqft": 1941, "lot_sqft": 43560, "year_built": 1981, "dom": 2, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 1028.0, "distress_signals": [], "ai_analysis": null, "lat": 38.344202, "lng": -122.276108, "url": null}, {"id": 243, "address": "205 Splittail Way", "city": "Napa", "county": null, "zip": "94558", "price": 828503, "beds": 4, "baths": 3.5, "sqft": 2138, "lot_sqft": 2040, "year_built": 2026, "dom": 9, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 388.0, "distress_signals": [], "ai_analysis": null, "lat": 38.2552846, "lng": -122.2780233, "url": null}, {"id": 244, "address": "324 Pear Tree Ter Unit B", "city": "Napa", "county": null, "zip": "94558", "price": 799000, "beds": 3, "baths": 3.0, "sqft": 1472, "lot_sqft": 902, "year_built": 2021, "dom": 11, "score": 25.0, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 543.0, "distress_signals": [], "ai_analysis": null, "lat": 38.321213, "lng": -122.29043, "url": null}, {"id": 245, "address": "321 Canyon Estates Cir", "city": "American Canyon", "county": null, "zip": "94503", "price": 1766759, "beds": 4, "baths": 3.5, "sqft": 3670, "lot_sqft": 0, "year_built": 2026, "dom": 8, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 481.0, "distress_signals": [], "ai_analysis": null, "lat": 38.176622, "lng": -122.240503, "url": null}, {"id": 246, "address": "Danika Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1645950, "beds": 4, "baths": 3.5, "sqft": 3670, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 448.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 247, "address": "Ryder Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1700950, "beds": 4, "baths": 4.5, "sqft": 3810, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 446.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 248, "address": "Rocco Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1575950, "beds": 4, "baths": 3.5, "sqft": 3480, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 453.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 249, "address": "Robert Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1735950, "beds": 4, "baths": 3.5, "sqft": 4010, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Townhouse", "price_per_sqft": 433.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 250, "address": "Dayton Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1700950, "beds": 5, "baths": 4.5, "sqft": 3950, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 431.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 251, "address": "Haddaway Plan", "city": "American Canyon", "county": null, "zip": "94503", "price": 1800950, "beds": 5, "baths": 5.5, "sqft": 4120, "lot_sqft": 0, "year_built": 0, "dom": 18, "score": 25.0, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 437.0, "distress_signals": [], "ai_analysis": null, "lat": 38.17264, "lng": -122.241166, "url": null}, {"id": 252, "address": "1903 Colombard Way", "city": "Yountville", "county": null, "zip": "94599", "price": 1895000, "beds": 3, "baths": 2.0, "sqft": 1900, "lot_sqft": 5301, "year_built": 1987, "dom": 38, "score": 18.16, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 997.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4013139, "lng": -122.3555444, "url": null}, {"id": 253, "address": "4500 Silverado Trl", "city": "Calistoga", "county": null, "zip": "94515", "price": 1000000, "beds": 0, "baths": 0, "sqft": 0, "lot_sqft": 209088, "year_built": 0, "dom": 94, "score": 15.0, "tier": "Pass", "property_type": "Vacant Land", "price_per_sqft": 0, "distress_signals": [], "ai_analysis": null, "lat": 38.5756227, "lng": -122.5454299, "url": null}, {"id": 254, "address": "102 Vineyard Cir", "city": "Yountville", "county": null, "zip": "94599", "price": 1125000, "beds": 3, "baths": 2.0, "sqft": 1213, "lot_sqft": 1597, "year_built": 1977, "dom": 44, "score": 13.77, "tier": "Pass", "property_type": "Condo/Co-op", "price_per_sqft": 927.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4052851, "lng": -122.3581059, "url": null}, {"id": 255, "address": "46 Lande Way", "city": "Yountville", "county": null, "zip": "94599", "price": 1795000, "beds": 3, "baths": 2.5, "sqft": 1796, "lot_sqft": 4125, "year_built": 2006, "dom": 27, "score": 9.19, "tier": "Pass", "property_type": "Single Family Residential", "price_per_sqft": 999.0, "distress_signals": [], "ai_analysis": null, "lat": 38.4070908, "lng": -122.363545, "url": null}, {"id": 256, "address": "4210 Saint Helena Hwy", "city": "Calistoga", "county": null, "zip": "94515", "price": 1195000, "beds": 0, "baths": 0, "sqft": 0, "lot_sqft": 257875, "year_built": 0, "dom": 41, "score": 2.75, "tier": "Pass", "property_type": "Vacant Land", "price_per_sqft": 0, "distress_signals": [], "ai_analysis": null, "lat": 38.564172, "lng": -122.54855, "url": null}, {"id": 257, "address": "316 Deer Hollow Dr", "city": "Napa", "county": null, "zip": "94558", "price": 1995000, "beds": 3, "baths": 3.0, "sqft": 2535, "lot_sqft": 1634, "year_built": 2020, "dom": 19, "score": 1.35, "tier": "Pass", "property_type": "Condo/Co-op", "price_per_sqft": 787.0, "distress_signals": [], "ai_analysis": null, "lat": 38.357099, "lng": -122.258872, "url": null}, {"id": 258, "address": null, "city": null, "county": null, "zip": null, "price": 0, "beds": 0, "baths": 0, "sqft": 0, "lot_sqft": 0, "year_built": 0, "dom": 0, "score": 0, "tier": "Pass", "property_type": null, "price_per_sqft": 0, "distress_signals": [], "ai_analysis": null, "lat": null, "lng": null, "url": null}];
+        const KPIS = {"total_deals": 258, "strong_buys": 0, "avg_score": 46, "best_deal": "1610 Capell Valley Rd (70.0)"};
+        const CHART_DATA = {"score_dist": [7, 73, 127, 51, 0], "dom_dist": [65, 44, 34, 115], "city_data": {"Napa": [1149000, 868000, 874000, 795000, 1995000, 775000, 929000, 1875000, 1789000, 899000, 1999000, 1399000, 1000500, 1399000, 1995000, 839000, 975000, 975000, 1599000, 865000, 1384000, 1295000, 1998000, 1299000, 840000, 1525000, 1295000, 850000, 1485000, 779000, 859999, 1485000, 1390000, 1699000, 1198000, 799000, 1100000, 930000, 1150000, 1499000, 875000, 885000, 959000, 799000, 1300000, 1490000, 890000, 929000, 1349000, 775000, 1650000, 1050000, 1659000, 1150000, 1065000, 798000, 849000, 799000, 1150000, 779000, 1130000, 1595000, 899000, 1499000, 1600000, 1949000, 1429000, 768000, 1199000, 1379000, 998000, 1135000, 1735000, 1550000, 1125000, 1298000, 1495000, 1074500, 1249000, 988000, 847000, 1790000, 850000, 875000, 1395000, 1100000, 899000, 975000, 824000, 975000, 1999000, 1149000, 899000, 1780000, 1850000, 1499000, 1669000, 919990, 1299575, 1149000, 1799500, 1550000, 975000, 849000, 1435000, 1099000, 1650000, 1395000, 1695000, 1288000, 1995000, 1900000, 759990, 879167, 929990, 929990, 947231, 1051616, 979990, 1087276, 849990, 759990, 1417000, 929990, 838240, 1295000, 884500, 1149000, 1595000, 899000, 1000000, 1515000, 1225000, 1395000, 1295000, 1650000, 1295000, 1349000, 973473, 1595000, 880000, 1295500, 1650000, 1045000, 1369000, 1850000, 1200000, 1499000, 1995000, 847500, 899000, 1695000, 895000, 999000, 775000, 759990, 849990, 759990, 1895000, 838240, 999000, 835000, 995000, 1029000, 1995000, 828503, 799000, 1995000], "Angwin": [1095000, 1991000, 795000, 1349000, 1375000, 1149000, 1595000, 895000, 1490000, 1410000, 975000, 1120000, 1120000, 895000, 1295000, 1295000, 1790000, 1995000], "Deer Park": [750000], "Calistoga": [1050000, 759500, 950000, 1399000, 985000, 1790000, 950000, 1490000, 1195000, 1799000, 1100000, 965000, 999000, 1265000, 1700000, 1000000, 1195000], "Saint Helena": [1290000, 895000, 1995000, 1995000, 1575000, 975000, 765000, 1190000, 1650000, 1250000, 1099000, 1695000, 1595000, 1190000, 1595000, 1249000, 1698000, 1798000, 1975000, 1549000, 915000, 1325000, 1285000, 1400000], "Pope Valley": [1625000], "American Canyon": [780000, 779999, 1845950, 850000, 899000, 1945239, 797990, 914500, 1125000, 1110000, 811990, 750990, 822990, 1835950, 1845950, 1766759, 1645950, 1700950, 1575950, 1735950, 1700950, 1800950], "Yountville": [1900000, 1695000, 1575000, 1895000, 1125000, 1795000], "null": [0]}, "city_avg": {"Napa": 1217084.5833333333, "Angwin": 1312722.2222222222, "Deer Park": 750000.0, "Calistoga": 1211264.705882353, "Saint Helena": 1414500.0, "Pope Valley": 1625000.0, "American Canyon": 1320136.6818181819, "Yountville": 1664166.6666666667, "null": 0.0}};
+        const HISTORY = [];
+        
+        // State
+        let currentProperties = [...PROPERTIES];
+        let mapInstance = null;
+        let markerCluster = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            initKPIs();
+            initCharts();
+            initHistory();
+            setupEventListeners();
+            
+            // Initial render
+            applyFiltersAndSort();
+        });
+
+        // Initialize KPIs
+        function initKPIs() {
+            document.getElementById('kpi-total').textContent = KPIS.total_deals;
+            document.getElementById('kpi-strong').textContent = KPIS.strong_buys;
+            document.getElementById('kpi-avg').textContent = KPIS.avg_score;
+            document.getElementById('kpi-best').textContent = KPIS.best_deal;
+        }
+
+        // Format Currency
+        const formatMoney = (amount) => {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+        };
+
+        // Render Cards
+        function renderCards(properties) {
+            const container = document.getElementById('cards-view');
+            container.innerHTML = '';
+            
+            properties.forEach(prop => {
+                let tierClass = 'tier-pass';
+                if (prop.score >= 80) tierClass = 'tier-strong';
+                else if (prop.score >= 60) tierClass = 'tier-worth';
+                else if (prop.score >= 40) tierClass = 'tier-monitor';
+                
+                const card = document.createElement('div');
+                card.className = 'deal-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="score-badge ${tierClass}">${prop.score}</div>
+                        <div class="price">${formatMoney(prop.price)}</div>
+                        <div class="address">${prop.address}</div>
+                        <div class="location">${prop.city}, ${prop.county} ${prop.zip}</div>
+                    </div>
+                    
+                    <div class="card-stats">
+                        <div class="stat-item">
+                            <span class="stat-value">${prop.beds} / ${prop.baths}</span>
+                            <span class="stat-label">Beds / Baths</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${prop.sqft}</span>
+                            <span class="stat-label">Sqft</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">$${prop.price_per_sqft}</span>
+                            <span class="stat-label">$/Sqft</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="tags-container">
+                            <span class="tag ${prop.dom > 60 ? 'tag-dom-high' : ''}">${prop.dom} Days on Market</span>
+                            <span class="tag">Built ${prop.year_built}</span>
+                            ${prop.property_type ? `<span class="tag">${prop.property_type}</span>` : ''}
+                            ${(prop.distress_signals || []).map(s => `<span class="tag" style="border-color: var(--accent-amber); color: var(--accent-amber)">${s}</span>`).join('')}
+                        </div>
+                        <button class="btn toggle-ai" style="width: 100%; font-size: 0.8rem; margin-top: 5px;">✨ View AI Analysis</button>
+                        <div class="ai-analysis">${prop.ai_analysis || 'No detailed analysis available.'}</div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="${prop.url}" target="_blank" class="btn btn-primary">View Listing</a>
+                    </div>
+                `;
+                
+                // Add event listener for AI toggle
+                const toggleBtn = card.querySelector('.toggle-ai');
+                const aiBox = card.querySelector('.ai-analysis');
+                toggleBtn.addEventListener('click', () => {
+                    if (aiBox.style.display === 'block') {
+                        aiBox.style.display = 'none';
+                        toggleBtn.textContent = '✨ View AI Analysis';
+                    } else {
+                        aiBox.style.display = 'block';
+                        toggleBtn.textContent = 'Hide Analysis';
+                    }
+                });
+                
+                container.appendChild(card);
+            });
+            
+            document.getElementById('results-count').textContent = `${properties.length} properties found`;
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // View Toggles
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    const view = e.target.getAttribute('data-view');
+                    if (view === 'cards') {
+                        document.getElementById('cards-view').style.display = 'grid';
+                        document.getElementById('map-view').style.display = 'none';
+                    } else {
+                        document.getElementById('cards-view').style.display = 'none';
+                        document.getElementById('map-view').style.display = 'block';
+                        if (!mapInstance) initMap();
+                        else mapInstance.invalidateSize();
+                        updateMapMarkers(currentProperties);
+                    }
+                });
+            });
+
+            // Filters & Sort
+            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-search', 'sort-select'];
+            filterElements.forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFiltersAndSort);
+                if (id === 'filter-search') {
+                    document.getElementById(id).addEventListener('keyup', applyFiltersAndSort);
+                }
+            });
+
+            document.getElementById('btn-clear-filters').addEventListener('click', () => {
+                document.getElementById('filter-county').value = 'all';
+                document.getElementById('filter-tier').value = 'all';
+                document.getElementById('filter-price').value = '99999999';
+                document.getElementById('filter-search').value = '';
+                document.getElementById('sort-select').value = 'score_desc';
+                applyFiltersAndSort();
+            });
+        }
+
+        function applyFiltersAndSort() {
+            const county = document.getElementById('filter-county').value;
+            const tier = document.getElementById('filter-tier').value;
+            const price = parseInt(document.getElementById('filter-price').value);
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            const sort = document.getElementById('sort-select').value;
+
+            // Filter
+            currentProperties = PROPERTIES.filter(p => {
+                if (county !== 'all' && p.county !== county) return false;
+                if (tier !== 'all' && p.tier !== tier) return false;
+                if (p.price > price) return false;
+                if (search && !(`${p.address} ${p.city} ${p.zip}`.toLowerCase().includes(search))) return false;
+                return true;
+            });
+
+            // Sort
+            currentProperties.sort((a, b) => {
+                if (sort === 'score_desc') return b.score - a.score;
+                if (sort === 'price_asc') return a.price - b.price;
+                if (sort === 'price_desc') return b.price - a.price;
+                if (sort === 'dom_asc') return a.dom - b.dom;
+                return 0;
+            });
+
+            // Re-render
+            const activeView = document.querySelector('.toggle-btn.active').getAttribute('data-view');
+            if (activeView === 'cards') {
+                renderCards(currentProperties);
+            } else {
+                updateMapMarkers(currentProperties);
+            }
+            
+            // Always render cards to DOM so it's ready on toggle
+            if (activeView !== 'cards') renderCards(currentProperties);
+        }
+
+        // Initialize Map
+        function initMap() {
+            mapInstance = L.map('map-view').setView([37.56, -122.1], 9);
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(mapInstance);
+            
+            markerCluster = L.markerClusterGroup({
+                iconCreateFunction: function(cluster) {
+                    return L.divIcon({ html: `<b>${cluster.getChildCount()}</b>`, className: 'mycluster', iconSize: L.point(40, 40) });
+                }
+            });
+            mapInstance.addLayer(markerCluster);
+        }
+
+        function updateMapMarkers(properties) {
+            if (!mapInstance || !markerCluster) return;
+            
+            markerCluster.clearLayers();
+            
+            properties.forEach(prop => {
+                if (!prop.lat || !prop.lng) return;
+                
+                let color = '#ff5252'; // pass
+                if (prop.score >= 80) color = '#00e676';
+                else if (prop.score >= 60) color = '#ffbf69';
+                else if (prop.score >= 40) color = '#2979ff';
+                
+                const markerHtml = `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${color}"></div>`;
+                const icon = L.divIcon({ html: markerHtml, className: 'custom-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
+                
+                const marker = L.marker([prop.lat, prop.lng], { icon: icon });
+                
+                const popupContent = `
+                    <div class="map-popup">
+                        <h4>${formatMoney(prop.price)}</h4>
+                        <p>${prop.address}</p>
+                        <p>${prop.city}, CA ${prop.zip}</p>
+                        <hr style="border-color: rgba(255,255,255,0.1); margin: 8px 0;">
+                        <p><strong>Score: ${prop.score}</strong> (${prop.tier})</p>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                markerCluster.addLayer(marker);
+            });
+        }
+
+        // Initialize Charts
+        function initCharts() {
+            Chart.defaults.color = '#8b92a5';
+            Chart.defaults.font.family = 'Outfit';
+            Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(25, 28, 36, 0.9)';
+            Chart.defaults.plugins.tooltip.titleColor = '#f0f2f5';
+            
+            // Score Dist Chart
+            const ctxScore = document.getElementById('chart-score').getContext('2d');
+            new Chart(ctxScore, {
+                type: 'bar',
+                data: {
+                    labels: ['0-19', '20-39', '40-59', '60-79', '80-100'],
+                    datasets: [{
+                        label: 'Properties by Score',
+                        data: CHART_DATA.score_dist,
+                        backgroundColor: ['#ff5252', '#ff5252', '#2979ff', '#ffbf69', '#00e676'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Score Distribution', color: '#f0f2f5' } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // City Avg Price Chart
+            const cities = Object.keys(CHART_DATA.city_avg);
+            const avgPrices = Object.values(CHART_DATA.city_avg);
+            
+            const ctxPrice = document.getElementById('chart-price').getContext('2d');
+            new Chart(ctxPrice, {
+                type: 'bar',
+                data: {
+                    labels: cities,
+                    datasets: [{
+                        label: 'Avg Price',
+                        data: avgPrices,
+                        backgroundColor: '#bb86fc',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Average Listing Price by City', color: '#f0f2f5' } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // DOM Chart
+            const ctxDom = document.getElementById('chart-dom').getContext('2d');
+            new Chart(ctxDom, {
+                type: 'doughnut',
+                data: {
+                    labels: ['< 30 Days', '30-60 Days', '60-90 Days', '90+ Days'],
+                    datasets: [{
+                        data: CHART_DATA.dom_dist,
+                        backgroundColor: ['#00e676', '#2979ff', '#ffbf69', '#ff5252'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { display: true, text: 'Days on Market', color: '#f0f2f5' },
+                        legend: { position: 'right' }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Initialize History Table
+        function initHistory() {
+            const tbody = document.querySelector('#history-table tbody');
+            HISTORY.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.date}</td>
+                    <td><span class="tag">${row.source}</span></td>
+                    <td>${row.scanned}</td>
+                    <td><strong>${row.new_deals}</strong></td>
+                    <td>${row.top_deal}</td>
+                    <td><span style="color: ${row.top_score >= 80 ? 'var(--accent-green)' : 'var(--text-primary)'}; font-weight: 800">${row.top_score}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+    </script>
+</body>
+</html>
