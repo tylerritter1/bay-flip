@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bay Flip - Real Estate Deal Finder</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --surface-color: #191c24;
+            --surface-hover: #1e2230;
+            --text-primary: #f0f2f5;
+            --text-secondary: #8b92a5;
+            --border-color: rgba(255,255,255,0.06);
+            --accent-green: #00e676;
+            --accent-amber: #ffbf69;
+            --accent-blue: #2979ff;
+            --accent-red: #ff5252;
+            --accent-purple: #bb86fc;
+            
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-feature-settings: 'tnum';
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+        .text-muted { color: var(--text-secondary); }
+        
+        /* Layout Utilities */
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+
+        /* Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(15, 17, 21, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 0;
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo span {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* KPI Bar */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .kpi-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: var(--border-color);
+            transition: var(--transition-smooth);
+        }
+        .kpi-card:nth-child(1):hover::before { background: var(--accent-blue); }
+        .kpi-card:nth-child(2):hover::before { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+        .kpi-card:nth-child(3):hover::before { background: var(--accent-purple); }
+        .kpi-card:nth-child(4):hover::before { background: var(--accent-amber); }
+        
+        .kpi-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+        
+        /* Filters */
+        .filters-section {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        select, input {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+        select:focus, input:focus {
+            border-color: var(--accent-blue);
+        }
+        .btn {
+            background: var(--surface-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: var(--transition-smooth);
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .btn-primary {
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+        }
+        .btn-primary:hover {
+            background: #1e62d4;
+        }
+
+        /* View Toggle */
+        .view-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .toggle-group {
+            display: flex;
+            background: var(--surface-color);
+            border-radius: 8px;
+            padding: 4px;
+            border: 1px solid var(--border-color);
+        }
+        .toggle-btn {
+            padding: 6px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition-smooth);
+        }
+        .toggle-btn.active {
+            background: var(--surface-hover);
+            color: var(--text-primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Cards Grid */
+        #cards-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .deal-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: var(--transition-smooth);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .deal-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.1);
+        }
+        .card-header {
+            padding: 20px 20px 10px;
+            position: relative;
+        }
+        .score-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #000;
+            box-shadow: 0 0 15px currentColor;
+        }
+        .tier-strong { background: var(--accent-green); color: #000; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); }
+        .tier-worth { background: var(--accent-amber); color: #000; box-shadow: 0 0 15px rgba(255, 191, 105, 0.4); }
+        .tier-monitor { background: var(--accent-blue); color: #fff; box-shadow: 0 0 15px rgba(41, 121, 255, 0.4); }
+        .tier-pass { background: var(--accent-red); color: #fff; box-shadow: 0 0 15px rgba(255, 82, 82, 0.4); }
+        
+        .price {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        .address {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .location {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        
+        .card-body {
+            padding: 15px 20px;
+            flex-grow: 1;
+        }
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .tag {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .tag-dom-high { border-color: var(--accent-red); color: var(--accent-red); }
+        
+        .ai-analysis {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            background: rgba(187, 134, 252, 0.05);
+            border-left: 3px solid var(--accent-purple);
+            padding: 10px 15px;
+            border-radius: 0 6px 6px 0;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .card-footer {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .card-footer .btn { flex-grow: 1; text-align: center; text-decoration: none; }
+
+        /* Map View */
+        #map-view {
+            display: none;
+            height: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 40px;
+        }
+        
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .chart-container {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            height: 300px;
+            position: relative;
+        }
+
+        /* History Table */
+        .history-section {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 40px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding: 20px 0;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        /* Custom Map Tooltips */
+        .leaflet-popup-content-wrapper {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip { background: var(--surface-color); }
+        .map-popup h4 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .map-popup p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                🏠 <span>Bay Flip</span>
+            </div>
+            <div class="header-meta">
+                Last updated: {{GENERATED_AT}}
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">Total Deals Scanned</div>
+                <div class="kpi-value" id="kpi-total">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Strong Buys Found</div>
+                <div class="kpi-value" style="color: var(--accent-green)" id="kpi-strong">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Average Deal Score</div>
+                <div class="kpi-value" id="kpi-avg">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Best Deal</div>
+                <div class="kpi-value" style="font-size: 1.2rem; line-height: 1.2; margin-top: 10px;" id="kpi-best">N/A</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <label class="filter-label">County</label>
+                <select id="filter-county">
+                    <option value="all">All Counties</option>
+                    <option value="San Francisco">San Francisco</option>
+                    <option value="Alameda">Alameda</option>
+                    <option value="Contra Costa">Contra Costa</option>
+                    <option value="Marin">Marin</option>
+                    <option value="Napa">Napa</option>
+                    <option value="San Mateo">San Mateo</option>
+                    <option value="Santa Clara">Santa Clara</option>
+                    <option value="Sonoma">Sonoma</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Score Tier</label>
+                <select id="filter-tier">
+                    <option value="all">All Tiers</option>
+                    <option value="Strong Buy">🔥 Strong Buy</option>
+                    <option value="Worth a Look">⚡ Worth a Look</option>
+                    <option value="Monitor">📊 Monitor</option>
+                    <option value="Pass">❌ Pass</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Max Price</label>
+                <select id="filter-price">
+                    <option value="99999999">Any Price</option>
+                    <option value="1000000">< $1M</option>
+                    <option value="1500000">< $1.5M</option>
+                    <option value="2000000">< $2M</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input type="text" id="filter-search" placeholder="City, Zip, Keyword...">
+            </div>
+            <button class="btn" id="btn-clear-filters" style="margin-top: 20px;">Clear All</button>
+        </div>
+
+        <!-- View Controls -->
+        <div class="view-controls">
+            <div>
+                <span id="results-count" class="text-muted" style="font-weight: 600;">0 properties found</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="filter-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                    <label class="filter-label" style="margin: 0;">Sort By</label>
+                    <select id="sort-select">
+                        <option value="score_desc">Score (High to Low)</option>
+                        <option value="price_asc">Price (Low to High)</option>
+                        <option value="price_desc">Price (High to Low)</option>
+                        <option value="dom_asc">Days on Market (Low to High)</option>
+                    </select>
+                </div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-view="cards">Cards</button>
+                    <button class="toggle-btn" data-view="map">Map</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Views -->
+        <div id="cards-view">
+            <!-- Cards generated by JS -->
+        </div>
+
+        <div id="map-view">
+            <!-- Map container -->
+        </div>
+        
+        <!-- Analytics -->
+        <h3 class="mb-6">Analytics</h3>
+        <div class="charts-section">
+            <div class="chart-container">
+                <canvas id="chart-score"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-price"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-dom"></canvas>
+            </div>
+        </div>
+
+        <!-- History -->
+        <h3 class="mb-6">Scan History</h3>
+        <div class="history-section">
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Source</th>
+                        <th>Scanned</th>
+                        <th>New Deals</th>
+                        <th>Top Deal</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table rows generated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            Built with Bay Flip v1.0 • Data generated at {{GENERATED_AT}}
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
+    <script>
+        // Data injected from Python
+        const PROPERTIES = {{PROPERTIES_JSON}};
+        const KPIS = {{KPI_JSON}};
+        const CHART_DATA = {{CHART_DATA_JSON}};
+        const HISTORY = {{SCAN_HISTORY_JSON}};
+        
+        // State
+        let currentProperties = [...PROPERTIES];
+        let mapInstance = null;
+        let markerCluster = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            initKPIs();
+            initCharts();
+            initHistory();
+            setupEventListeners();
+            
+            // Initial render
+            applyFiltersAndSort();
+        });
+
+        // Initialize KPIs
+        function initKPIs() {
+            document.getElementById('kpi-total').textContent = KPIS.total_deals;
+            document.getElementById('kpi-strong').textContent = KPIS.strong_buys;
+            document.getElementById('kpi-avg').textContent = KPIS.avg_score;
+            document.getElementById('kpi-best').textContent = KPIS.best_deal;
+        }
+
+        // Format Currency
+        const formatMoney = (amount) => {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+        };
+
+        // Render Cards
+        function renderCards(properties) {
+            const container = document.getElementById('cards-view');
+            container.innerHTML = '';
+            
+            properties.forEach(prop => {
+                let tierClass = 'tier-pass';
+                if (prop.score >= 80) tierClass = 'tier-strong';
+                else if (prop.score >= 60) tierClass = 'tier-worth';
+                else if (prop.score >= 40) tierClass = 'tier-monitor';
+                
+                const card = document.createElement('div');
+                card.className = 'deal-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="score-badge ${tierClass}">${prop.score}</div>
+                        <div class="price">${formatMoney(prop.price)}</div>
+                        <div class="address">${prop.address}</div>
+                        <div class="location">${prop.city}, ${prop.county} ${prop.zip}</div>
+                    </div>
+                    
+                    <div class="card-stats">
+                        <div class="stat-item">
+                            <span class="stat-value">${prop.beds} / ${prop.baths}</span>
+                            <span class="stat-label">Beds / Baths</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${prop.sqft}</span>
+                            <span class="stat-label">Sqft</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">$${prop.price_per_sqft}</span>
+                            <span class="stat-label">$/Sqft</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="tags-container">
+                            <span class="tag ${prop.dom > 60 ? 'tag-dom-high' : ''}">${prop.dom} Days on Market</span>
+                            <span class="tag">Built ${prop.year_built}</span>
+                            ${prop.property_type ? `<span class="tag">${prop.property_type}</span>` : ''}
+                            ${(prop.distress_signals || []).map(s => `<span class="tag" style="border-color: var(--accent-amber); color: var(--accent-amber)">${s}</span>`).join('')}
+                        </div>
+                        <button class="btn toggle-ai" style="width: 100%; font-size: 0.8rem; margin-top: 5px;">✨ View AI Analysis</button>
+                        <div class="ai-analysis">${prop.ai_analysis || 'No detailed analysis available.'}</div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="${prop.url}" target="_blank" class="btn btn-primary">View Listing</a>
+                    </div>
+                `;
+                
+                // Add event listener for AI toggle
+                const toggleBtn = card.querySelector('.toggle-ai');
+                const aiBox = card.querySelector('.ai-analysis');
+                toggleBtn.addEventListener('click', () => {
+                    if (aiBox.style.display === 'block') {
+                        aiBox.style.display = 'none';
+                        toggleBtn.textContent = '✨ View AI Analysis';
+                    } else {
+                        aiBox.style.display = 'block';
+                        toggleBtn.textContent = 'Hide Analysis';
+                    }
+                });
+                
+                container.appendChild(card);
+            });
+            
+            document.getElementById('results-count').textContent = `${properties.length} properties found`;
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // View Toggles
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    const view = e.target.getAttribute('data-view');
+                    if (view === 'cards') {
+                        document.getElementById('cards-view').style.display = 'grid';
+                        document.getElementById('map-view').style.display = 'none';
+                    } else {
+                        document.getElementById('cards-view').style.display = 'none';
+                        document.getElementById('map-view').style.display = 'block';
+                        if (!mapInstance) initMap();
+                        else mapInstance.invalidateSize();
+                        updateMapMarkers(currentProperties);
+                    }
+                });
+            });
+
+            // Filters & Sort
+            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-search', 'sort-select'];
+            filterElements.forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFiltersAndSort);
+                if (id === 'filter-search') {
+                    document.getElementById(id).addEventListener('keyup', applyFiltersAndSort);
+                }
+            });
+
+            document.getElementById('btn-clear-filters').addEventListener('click', () => {
+                document.getElementById('filter-county').value = 'all';
+                document.getElementById('filter-tier').value = 'all';
+                document.getElementById('filter-price').value = '99999999';
+                document.getElementById('filter-search').value = '';
+                document.getElementById('sort-select').value = 'score_desc';
+                applyFiltersAndSort();
+            });
+        }
+
+        function applyFiltersAndSort() {
+            const county = document.getElementById('filter-county').value;
+            const tier = document.getElementById('filter-tier').value;
+            const price = parseInt(document.getElementById('filter-price').value);
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            const sort = document.getElementById('sort-select').value;
+
+            // Filter
+            currentProperties = PROPERTIES.filter(p => {
+                if (county !== 'all' && p.county !== county) return false;
+                if (tier !== 'all' && p.tier !== tier) return false;
+                if (p.price > price) return false;
+                if (search && !(`${p.address} ${p.city} ${p.zip}`.toLowerCase().includes(search))) return false;
+                return true;
+            });
+
+            // Sort
+            currentProperties.sort((a, b) => {
+                if (sort === 'score_desc') return b.score - a.score;
+                if (sort === 'price_asc') return a.price - b.price;
+                if (sort === 'price_desc') return b.price - a.price;
+                if (sort === 'dom_asc') return a.dom - b.dom;
+                return 0;
+            });
+
+            // Re-render
+            const activeView = document.querySelector('.toggle-btn.active').getAttribute('data-view');
+            if (activeView === 'cards') {
+                renderCards(currentProperties);
+            } else {
+                updateMapMarkers(currentProperties);
+            }
+            
+            // Always render cards to DOM so it's ready on toggle
+            if (activeView !== 'cards') renderCards(currentProperties);
+        }
+
+        // Initialize Map
+        function initMap() {
+            mapInstance = L.map('map-view').setView([37.56, -122.1], 9);
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(mapInstance);
+            
+            markerCluster = L.markerClusterGroup({
+                iconCreateFunction: function(cluster) {
+                    return L.divIcon({ html: `<b>${cluster.getChildCount()}</b>`, className: 'mycluster', iconSize: L.point(40, 40) });
+                }
+            });
+            mapInstance.addLayer(markerCluster);
+        }
+
+        function updateMapMarkers(properties) {
+            if (!mapInstance || !markerCluster) return;
+            
+            markerCluster.clearLayers();
+            
+            properties.forEach(prop => {
+                if (!prop.lat || !prop.lng) return;
+                
+                let color = '#ff5252'; // pass
+                if (prop.score >= 80) color = '#00e676';
+                else if (prop.score >= 60) color = '#ffbf69';
+                else if (prop.score >= 40) color = '#2979ff';
+                
+                const markerHtml = `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${color}"></div>`;
+                const icon = L.divIcon({ html: markerHtml, className: 'custom-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
+                
+                const marker = L.marker([prop.lat, prop.lng], { icon: icon });
+                
+                const popupContent = `
+                    <div class="map-popup">
+                        <h4>${formatMoney(prop.price)}</h4>
+                        <p>${prop.address}</p>
+                        <p>${prop.city}, CA ${prop.zip}</p>
+                        <hr style="border-color: rgba(255,255,255,0.1); margin: 8px 0;">
+                        <p><strong>Score: ${prop.score}</strong> (${prop.tier})</p>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                markerCluster.addLayer(marker);
+            });
+        }
+
+        // Initialize Charts
+        function initCharts() {
+            Chart.defaults.color = '#8b92a5';
+            Chart.defaults.font.family = 'Outfit';
+            Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(25, 28, 36, 0.9)';
+            Chart.defaults.plugins.tooltip.titleColor = '#f0f2f5';
+            
+            // Score Dist Chart
+            const ctxScore = document.getElementById('chart-score').getContext('2d');
+            new Chart(ctxScore, {
+                type: 'bar',
+                data: {
+                    labels: ['0-19', '20-39', '40-59', '60-79', '80-100'],
+                    datasets: [{
+                        label: 'Properties by Score',
+                        data: CHART_DATA.score_dist,
+                        backgroundColor: ['#ff5252', '#ff5252', '#2979ff', '#ffbf69', '#00e676'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Score Distribution', color: '#f0f2f5' } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // City Avg Price Chart
+            const cities = Object.keys(CHART_DATA.city_avg);
+            const avgPrices = Object.values(CHART_DATA.city_avg);
+            
+            const ctxPrice = document.getElementById('chart-price').getContext('2d');
+            new Chart(ctxPrice, {
+                type: 'bar',
+                data: {
+                    labels: cities,
+                    datasets: [{
+                        label: 'Avg Price',
+                        data: avgPrices,
+                        backgroundColor: '#bb86fc',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Average Listing Price by City', color: '#f0f2f5' } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // DOM Chart
+            const ctxDom = document.getElementById('chart-dom').getContext('2d');
+            new Chart(ctxDom, {
+                type: 'doughnut',
+                data: {
+                    labels: ['< 30 Days', '30-60 Days', '60-90 Days', '90+ Days'],
+                    datasets: [{
+                        data: CHART_DATA.dom_dist,
+                        backgroundColor: ['#00e676', '#2979ff', '#ffbf69', '#ff5252'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { display: true, text: 'Days on Market', color: '#f0f2f5' },
+                        legend: { position: 'right' }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Initialize History Table
+        function initHistory() {
+            const tbody = document.querySelector('#history-table tbody');
+            HISTORY.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.date}</td>
+                    <td><span class="tag">${row.source}</span></td>
+                    <td>${row.scanned}</td>
+                    <td><strong>${row.new_deals}</strong></td>
+                    <td>${row.top_deal}</td>
+                    <td><span style="color: ${row.top_score >= 80 ? 'var(--accent-green)' : 'var(--text-primary)'}; font-weight: 800">${row.top_score}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+    </script>
+</body>
+</html>
