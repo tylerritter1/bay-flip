@@ -496,17 +496,6 @@
         }
         .tag-dom-high { border-color: var(--accent-red); color: var(--accent-red); }
         
-        .ai-analysis {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            background: rgba(187, 134, 252, 0.05);
-            border-left: 3px solid var(--accent-purple);
-            padding: 10px 15px;
-            border-radius: 0 6px 6px 0;
-            margin-top: 10px;
-            display: none;
-        }
-        
         .card-footer {
             padding: 15px 20px;
             display: flex;
@@ -930,8 +919,6 @@
                             ${prop.long_term_owner_flag ? `<span class="tag" style="border-color: var(--accent-blue); color: var(--accent-blue); font-weight: 600;">👤 Long-Term Owner</span>` : ''}
                             ${(prop.distress_signals || []).map(s => `<span class="tag" style="border-color: var(--accent-amber); color: var(--accent-amber)">${s}</span>`).join('')}
                         </div>
-                        <button class="btn toggle-ai" style="width: 100%; font-size: 0.8rem; margin-top: 5px;">✨ View AI Analysis</button>
-                        <div class="ai-analysis">${prop.ai_analysis || 'No detailed analysis available.'}</div>
                     </div>
                     
                     <div class="card-footer" style="display: flex; gap: 8px; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-color); margin-top: auto;">
@@ -940,19 +927,7 @@
                         <button class="btn-action-x" onclick="toggleHide('${prop.id}', event)" title="${isHidden ? 'Unhide property' : 'Hide property'}">${isHidden ? '↺' : '×'}</button>
                     </div>
                 `;
-                
-                // Add event listener for AI toggle
-                const toggleBtn = card.querySelector('.toggle-ai');
-                const aiBox = card.querySelector('.ai-analysis');
-                toggleBtn.addEventListener('click', () => {
-                    if (aiBox.style.display === 'block') {
-                        aiBox.style.display = 'none';
-                        toggleBtn.textContent = '✨ View AI Analysis';
-                    } else {
-                        aiBox.style.display = 'block';
-                        toggleBtn.textContent = 'Hide Analysis';
-                    }
-                });
+
                 
                 container.appendChild(card);
             });
