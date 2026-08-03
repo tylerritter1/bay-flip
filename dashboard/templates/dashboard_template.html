@@ -972,6 +972,8 @@
                     const viewport = document.getElementById('main-viewport');
                     viewport.className = `view-${view}`;
                     
+                    localStorage.setItem('active_view', view);
+                    
                     if (view === 'split' || view === 'map') {
                         if (!mapInstance) {
                             initMap();
@@ -980,10 +982,9 @@
                                 mapInstance.invalidateSize();
                             }, 100);
                         }
-                        updateMapMarkers(currentProperties);
                     }
                     
-                    localStorage.setItem('active_view', view);
+                    applyFiltersAndSort();
                 });
             });
 
