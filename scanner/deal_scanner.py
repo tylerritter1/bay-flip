@@ -82,6 +82,12 @@ def init_db():
         ai_analysis TEXT,
         listing_url TEXT,
         school_rating INTEGER,
+        original_price INTEGER,
+        price_drop_pct REAL DEFAULT 0.0,
+        adu_potential INTEGER DEFAULT 0,
+        probate_flag INTEGER DEFAULT 0,
+        long_term_owner_flag INTEGER DEFAULT 0,
+        primary_distress_badge TEXT,
         first_seen TEXT,
         last_updated TEXT,
         is_active INTEGER DEFAULT 1
@@ -180,6 +186,55 @@ def get_mock_school_rating(city: str) -> int:
     }
     return ratings.get(city_lower, 6) # Default to 6 if unknown
 
+def check_adu_potential(property_type: str, lot_sqft: Any, sqft: Any) -> int:
+    try:
+        p_type = str(property_type).strip().lower() if property_type else ""
+        if p_type in ['sfr', 'single family residential', 'house', 'single family home']:
+            lot = float(lot_sqft) if lot_sqft is not None else 0
+            bldg = float(sqft) if sqft is not None else 0
+            if lot >= 3000 and bldg > 0 and (lot / bldg) >= 3.0:
+                return 1
+    except: pass
+    return 0
+
+def detect_probate(distress_signals: List[str]) -> int:
+    signals_lower = [str(s).lower().strip() for s in distress_signals] if distress_signals else []
+    probate_keywords = ['probate', 'trust sale', 'conservatorship', 'subject to court approval', 'estate sale']
+    if any(kw in signals_lower for kw in probate_keywords):
+        return 1
+    return 0
+
+def detect_long_term_owner(distress_signals: List[str]) -> int:
+    signals_lower = [str(s).lower().strip() for s in distress_signals] if distress_signals else []
+    owner_keywords = ['original owner', 'first time on market', 'longtime family']
+    if any(kw in signals_lower for kw in owner_keywords):
+        return 1
+    return 0
+
+def get_primary_distress_badge(distress_signals: List[str], days_on_market: Any) -> str:
+    signals_lower = [str(s).lower().strip() for s in distress_signals] if distress_signals else []
+    
+    if 'fire damage' in signals_lower:
+        return 'Fire Damage'
+    if any(kw in signals_lower for kw in ['probate', 'trust sale', 'conservatorship', 'subject to court approval', 'estate sale']):
+        return 'Probate/Trust'
+    if any(kw in signals_lower for kw in ['auction', 'foreclosure', 'bank owned', 'reo', 'short sale']):
+        return 'Foreclosure'
+    if any(kw in signals_lower for kw in ['contractor', 'gut renovation', 'tear-down', 'uninhabitable']):
+        return 'Major Rehab'
+    if any(kw in signals_lower for kw in ['fixer', 'needs work', 'handyman', 'tlc', 'as-is', 'deferred maintenance']):
+        return 'Fixer-Upper'
+    if 'price drop' in signals_lower or 'motivated seller' in signals_lower:
+        return 'Motivated'
+    
+    try:
+        dom = float(days_on_market) if days_on_market is not None else 0
+        if dom > 60:
+            return 'Stale Listing'
+    except: pass
+    
+    return 'Value Opp'
+
 def ingest_redfin(csv_path: str) -> List[Dict]:
     logger.info(f"Ingesting Redfin CSV: {csv_path}")
     raw_props = parse_redfin_csv(csv_path)
@@ -222,6 +277,10 @@ def ingest_redfin(csv_path: str) -> List[Dict]:
         remarks = prop.get('listing_remarks', '')
         signals = detect_distress_signals(remarks)
         p['distress_signals'] = ','.join(signals) if signals else None
+        p['probate_flag'] = detect_probate(signals)
+        p['long_term_owner_flag'] = detect_long_term_owner(signals)
+        p['primary_distress_badge'] = get_primary_distress_badge(signals, p.get('days_on_market'))
+        p['adu_potential'] = check_adu_potential(p.get('property_type'), p.get('lot_sqft'), p.get('sqft'))
         
         # We would enrich here in a real scenario
         # p = enrich_property(p)
@@ -260,9 +319,14 @@ def save_to_db(properties: List[Dict]):
                 source, address, city, county, zip, list_price, beds, baths, sqft, lot_sqft, 
                 year_built, days_on_market, price_per_sqft, property_type, listing_url,
                 latitude, longitude, distress_signals, deal_score, deal_tier, ai_analysis,
-                school_rating, first_seen, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                school_rating, original_price, price_drop_pct, adu_potential, probate_flag,
+                long_term_owner_flag, primary_distress_badge, first_seen, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
+                price_drop_pct = CASE 
+                    WHEN original_price > excluded.list_price THEN ROUND(((original_price - excluded.list_price) * 100.0) / original_price, 2)
+                    ELSE 0.0
+                END,
                 list_price=excluded.list_price,
                 beds=excluded.beds,
                 baths=excluded.baths,
@@ -280,6 +344,10 @@ def save_to_db(properties: List[Dict]):
                 ai_analysis=excluded.ai_analysis,
                 county=excluded.county,
                 school_rating=excluded.school_rating,
+                adu_potential=excluded.adu_potential,
+                probate_flag=excluded.probate_flag,
+                long_term_owner_flag=excluded.long_term_owner_flag,
+                primary_distress_badge=excluded.primary_distress_badge,
                 last_updated=excluded.last_updated
             ''', (
                 p.get('source'), p.get('address'), p.get('city'), p.get('county'), p.get('zip'),
@@ -288,7 +356,9 @@ def save_to_db(properties: List[Dict]):
                 p.get('price_per_sqft'), p.get('property_type'), p.get('listing_url'),
                 p.get('latitude'), p.get('longitude'), p.get('distress_signals'),
                 p.get('deal_score'), p.get('deal_tier'), p.get('ai_analysis'),
-                p.get('school_rating'), now, now
+                p.get('school_rating'), p.get('list_price'), 0.0,
+                p.get('adu_potential'), p.get('probate_flag'), p.get('long_term_owner_flag'),
+                p.get('primary_distress_badge'), now, now
             ))
             count += 1
         except Exception as e:
