@@ -42,7 +42,7 @@ def send_deal_alert(deals: List[Dict], recipient: str):
     </head>
     <body>
       <div class="container">
-        <h1>Bay Flip Deals — {today}</h1>
+        <h1>Bay Opps Deals — {today}</h1>
     """
     
     for deal in deals:
@@ -81,7 +81,7 @@ def send_deal_alert(deals: List[Dict], recipient: str):
     """
     
     msg = MIMEText(html, "html")
-    msg["Subject"] = f"Bay Flip Top Deals — {today}"
+    msg["Subject"] = f"Bay Opps Top Deals — {today}"
     msg["From"] = EMAIL_FROM
     msg["To"] = recipient
     

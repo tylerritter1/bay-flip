@@ -1,11 +1,11 @@
-# Bay Flip 🏠
-> Surface value-add and fixer-upper opportunities in the Bay Area
+# Bay Opps 🏠
+> Surface real estate value-add and buy opportunities in the Bay Area
 
 ## 📌 Overview
 
-Finding actionable real estate deals in the competitive San Francisco Bay Area market is challenging. Traditional portals like Zillow and Redfin treat all listings equally and often hide value-add opportunities beneath standard marketing copy. Finding true fixer-uppers, high price-per-square-foot disparities, or long-days-on-market discounts requires tedious manual searching and analysis.
+Finding actionable real estate buy opportunities in the competitive San Francisco Bay Area market is challenging. Traditional portals like Zillow and Redfin treat all listings equally and often hide value-add opportunities beneath standard marketing copy. Finding true fixer-uppers, high price-per-square-foot disparities, or long-days-on-market discounts requires tedious manual searching and analysis.
 
-**Bay Flip** automates real estate deal sourcing by aggregating property exports, running multi-factor deal scoring algorithms, generating LLM-powered property investment briefs via Google Gemini, and presenting high-yield opportunities in an interactive dashboard.
+**Bay Opps** automates real estate deal sourcing by aggregating property exports, running multi-factor deal scoring algorithms, generating LLM-powered property investment briefs via Google Gemini, and presenting high-yield opportunities in an interactive dashboard.
 
 ---
 
