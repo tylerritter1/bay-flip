@@ -330,6 +330,48 @@
         .tier-monitor { background: var(--accent-blue); color: #fff; box-shadow: 0 0 15px rgba(41, 121, 255, 0.4); }
         .tier-pass { background: var(--accent-red); color: #fff; box-shadow: 0 0 15px rgba(255, 82, 82, 0.4); }
         
+        .primary-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            width: fit-content;
+        }
+        .badge-motivated { background: rgba(0, 230, 118, 0.15); color: var(--accent-green); border: 1px solid rgba(0, 230, 118, 0.3); }
+        .badge-probate { background: rgba(187, 134, 252, 0.15); color: var(--accent-purple); border: 1px solid rgba(187, 134, 252, 0.3); }
+        .badge-foreclosure { background: rgba(255, 82, 82, 0.15); color: var(--accent-red); border: 1px solid rgba(255, 82, 82, 0.3); }
+        .badge-rehab { background: rgba(255, 191, 105, 0.15); color: var(--accent-amber); border: 1px solid rgba(255, 191, 105, 0.3); }
+        .badge-fixer { background: rgba(255, 191, 105, 0.1); color: var(--accent-amber); border: 1px solid rgba(255, 191, 105, 0.2); }
+        .badge-stale { background: rgba(41, 121, 255, 0.15); color: var(--accent-blue); border: 1px solid rgba(41, 121, 255, 0.3); }
+        .badge-value { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); border: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        .price-container {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .price-original {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            text-decoration: line-through;
+            font-weight: 500;
+        }
+        .price-drop-tag {
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(0, 230, 118, 0.15);
+            color: var(--accent-green);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 230, 118, 0.3);
+            box-shadow: 0 0 8px rgba(0, 230, 118, 0.1);
+        }
+
         .price {
             font-size: 1.8rem;
             font-weight: 800;
@@ -584,6 +626,18 @@
                 <input type="checkbox" id="filter-show-hidden" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-blue);">
                 <label for="filter-show-hidden" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">Show Hidden</label>
             </div>
+            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
+                <input type="checkbox" id="filter-adu" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-green);">
+                <label for="filter-adu" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">🏡 ADU Potential</label>
+            </div>
+            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
+                <input type="checkbox" id="filter-probate" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-purple);">
+                <label for="filter-probate" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">⚖️ Probate/Trust</label>
+            </div>
+            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
+                <input type="checkbox" id="filter-price-reduced" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-blue);">
+                <label for="filter-price-reduced" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">🏷️ Price Reduced</label>
+            </div>
             <div class="filter-group">
                 <label class="filter-label">Search</label>
                 <input type="text" id="filter-search" placeholder="City, Zip, Keyword...">
@@ -752,12 +806,35 @@
                 const isShortlisted = shortlistedIds.includes(String(prop.id)) || shortlistedIds.includes(Number(prop.id));
                 const isHidden = hiddenIds.includes(String(prop.id)) || hiddenIds.includes(Number(prop.id));
                 
+                // Primary distress badge coloring
+                let badgeColorClass = 'badge-value';
+                const badgeLower = (prop.primary_distress_badge || '').toLowerCase();
+                if (badgeLower.includes('motivated')) badgeColorClass = 'badge-motivated';
+                else if (badgeLower.includes('probate')) badgeColorClass = 'badge-probate';
+                else if (badgeLower.includes('foreclosure')) badgeColorClass = 'badge-foreclosure';
+                else if (badgeLower.includes('rehab')) badgeColorClass = 'badge-rehab';
+                else if (badgeLower.includes('fixer')) badgeColorClass = 'badge-fixer';
+                else if (badgeLower.includes('stale')) badgeColorClass = 'badge-stale';
+                
+                // Price drop calculation
+                let priceHTML = `<div class="price">${formatMoney(prop.price)}</div>`;
+                if (prop.price_drop_pct > 0) {
+                    priceHTML = `
+                        <div class="price-container">
+                            <span class="price" style="margin-bottom: 0;">${formatMoney(prop.price)}</span>
+                            <span class="price-original">${formatMoney(prop.original_price)}</span>
+                            <span class="price-drop-tag">-${prop.price_drop_pct.toFixed(1)}%</span>
+                        </div>
+                    `;
+                }
+                
                 const card = document.createElement('div');
                 card.className = `deal-card ${isShortlisted ? 'shortlisted' : ''}`;
                 card.innerHTML = `
                     <div class="card-header">
                         <div class="score-badge ${tierClass}">${prop.score}</div>
-                        <div class="price">${formatMoney(prop.price)}</div>
+                        <span class="primary-badge ${badgeColorClass}">${prop.primary_distress_badge || 'Value Opp'}</span>
+                        ${priceHTML}
                         <div class="address">${prop.address}</div>
                         <div class="location">${prop.city}, ${prop.county} ${prop.zip}</div>
                     </div>
@@ -783,6 +860,9 @@
                             <span class="tag">Built ${prop.year_built}</span>
                             <span class="tag" style="${prop.school_rating >= 8 ? 'border-color: var(--accent-green); color: var(--accent-green); box-shadow: 0 0 8px rgba(0, 230, 118, 0.2);' : ''}">🎓 Schools: ${prop.school_rating}/10</span>
                             ${prop.property_type ? `<span class="tag">${prop.property_type}</span>` : ''}
+                            ${prop.adu_potential ? `<span class="tag" style="border-color: var(--accent-green); color: var(--accent-green); font-weight: 600;">🏡 ADU Potential</span>` : ''}
+                            ${prop.probate_flag ? `<span class="tag" style="border-color: var(--accent-purple); color: var(--accent-purple); font-weight: 600;">⚖️ Probate/Trust</span>` : ''}
+                            ${prop.long_term_owner_flag ? `<span class="tag" style="border-color: var(--accent-blue); color: var(--accent-blue); font-weight: 600;">👤 Long-Term Owner</span>` : ''}
                             ${(prop.distress_signals || []).map(s => `<span class="tag" style="border-color: var(--accent-amber); color: var(--accent-amber)">${s}</span>`).join('')}
                         </div>
                         <button class="btn toggle-ai" style="width: 100%; font-size: 0.8rem; margin-top: 5px;">✨ View AI Analysis</button>
@@ -838,12 +918,15 @@
             });
 
             // Filters & Sort
-            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-dom', 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 'filter-show-hidden'];
+            const filterElements = [
+                'filter-county', 'filter-tier', 'filter-price', 'filter-dom', 
+                'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 
+                'filter-show-hidden', 'filter-adu', 'filter-probate', 'filter-price-reduced'
+            ];
             filterElements.forEach(id => {
                 const el = document.getElementById(id);
-                if (id === 'filter-show-hidden') {
-                    el.addEventListener('change', applyFiltersAndSort);
-                } else if (id === 'filter-search') {
+                if (!el) return;
+                if (id === 'filter-search') {
                     el.addEventListener('keyup', applyFiltersAndSort);
                 } else {
                     el.addEventListener('change', applyFiltersAndSort);
@@ -858,6 +941,9 @@
                 document.getElementById('filter-sqft').value = '0';
                 document.getElementById('filter-schools').value = '0';
                 document.getElementById('filter-show-hidden').checked = false;
+                document.getElementById('filter-adu').checked = false;
+                document.getElementById('filter-probate').checked = false;
+                document.getElementById('filter-price-reduced').checked = false;
                 document.getElementById('filter-search').value = '';
                 document.getElementById('sort-select').value = 'score_desc';
                 applyFiltersAndSort();
@@ -871,7 +957,12 @@
             const domFilter = document.getElementById('filter-dom').value;
             const minSqft = parseInt(document.getElementById('filter-sqft').value);
             const schoolRating = parseInt(document.getElementById('filter-schools').value);
+            
             const showHidden = document.getElementById('filter-show-hidden').checked;
+            const showAduOnly = document.getElementById('filter-adu').checked;
+            const showProbateOnly = document.getElementById('filter-probate').checked;
+            const showPriceReducedOnly = document.getElementById('filter-price-reduced').checked;
+            
             const search = document.getElementById('filter-search').value.toLowerCase();
             const sort = document.getElementById('sort-select').value;
 
@@ -880,6 +971,11 @@
                 // Hidden filter
                 const isHidden = hiddenIds.includes(String(p.id)) || hiddenIds.includes(Number(p.id));
                 if (isHidden && !showHidden) return false;
+                
+                // Toggle filters
+                if (showAduOnly && !p.adu_potential) return false;
+                if (showProbateOnly && !p.probate_flag) return false;
+                if (showPriceReducedOnly && (!p.price_drop_pct || p.price_drop_pct <= 0)) return false;
                 
                 if (county !== 'all' && p.county !== county) return false;
                 if (tier !== 'all' && p.tier !== tier) return false;

@@ -50,6 +50,21 @@ def get_sample_data():
         lng_base = {"San Francisco": -122.42, "Alameda": -122.10, "Santa Clara": -121.90,
                     "San Mateo": -122.30, "Contra Costa": -122.05, "Marin": -122.53,
                     "Napa": -122.30, "Sonoma": -122.70}
+        has_drop = random.random() < 0.25
+        orig_price = price if not has_drop else int(price * 1.12)
+        drop_pct = 0.0 if not has_drop else 10.7
+        
+        prop_type = random.choice(["SFR", "Multi-Family", "Condo", "Land"])
+        lot_size = sqft * random.uniform(1.5, 5)
+        adu = 1 if prop_type == "SFR" and lot_size >= 3000 and (lot_size / sqft) >= 3.0 else 0
+        
+        probate = 1 if random.random() < 0.1 else 0
+        long_owner = 1 if random.random() < 0.15 else 0
+        
+        badge = "Value Opp"
+        if probate: badge = "Probate/Trust"
+        elif has_drop: badge = "Motivated"
+        elif random.random() < 0.4: badge = "Fixer-Upper"
         
         properties.append({
             "id": f"prop_{i}",
@@ -61,19 +76,25 @@ def get_sample_data():
             "beds": random.randint(2, 5),
             "baths": random.choice([1, 1.5, 2, 2.5, 3]),
             "sqft": sqft,
-            "lot_sqft": sqft * random.uniform(1.5, 5),
+            "lot_sqft": lot_size,
             "year_built": random.randint(1920, 2010),
             "dom": random.randint(1, 120),
             "score": score,
             "tier": tier,
-            "property_type": random.choice(["SFR", "Multi-Family", "Condo", "Land"]),
+            "property_type": prop_type,
             "price_per_sqft": round(price / sqft),
             "distress_signals": random.sample(["Price Drop", "Estate Sale", "As-Is", "Needs TLC", "Motivated Seller", "Fixer", "Probate"], random.randint(0, 3)),
             "ai_analysis": "This property shows potential for forced appreciation through cosmetic updates. The lot size is generous, providing potential for an ADU. Comps in the area suggest a strong ARV.",
             "lat": lat_base.get(county, 37.7) + random.uniform(-0.1, 0.1),
             "lng": lng_base.get(county, -122.2) + random.uniform(-0.1, 0.1),
             "url": "#",
-            "school_rating": random.randint(4, 10)
+            "school_rating": random.randint(4, 10),
+            "original_price": orig_price,
+            "price_drop_pct": drop_pct,
+            "adu_potential": adu,
+            "probate_flag": probate,
+            "long_term_owner_flag": long_owner,
+            "primary_distress_badge": badge
         })
     
     scan_history = [
@@ -134,7 +155,13 @@ def get_db_data(db_path):
                 "lat": r.get("latitude"),
                 "lng": r.get("longitude"),
                 "url": r.get("listing_url", "#"),
-                "school_rating": r.get("school_rating") or 6
+                "school_rating": r.get("school_rating") or 6,
+                "original_price": r.get("original_price") or r.get("list_price") or 0,
+                "price_drop_pct": r.get("price_drop_pct") or 0.0,
+                "adu_potential": r.get("adu_potential") or 0,
+                "probate_flag": r.get("probate_flag") or 0,
+                "long_term_owner_flag": r.get("long_term_owner_flag") or 0,
+                "primary_distress_badge": r.get("primary_distress_badge") or "Value Opp"
             })
         
         cur.execute("SELECT * FROM scan_history ORDER BY scan_date DESC LIMIT 10")

@@ -15,7 +15,9 @@ DISTRESS_KEYWORDS = [
     'deferred maintenance', 'needs work', 'tlc', 'handyman', 'potential',
     'contractor', 'gut renovation', 'fire damage', 'probate', 'bank owned',
     'foreclosure', 'auction', 'cash only', 'sold as-is', 'diamond in the rough',
-    'bring your vision', 'development opportunity', 'tear-down', 'uninhabitable'
+    'bring your vision', 'development opportunity', 'tear-down', 'uninhabitable',
+    'original owner', 'first time on market', 'longtime family', 'trust sale',
+    'conservatorship', 'subject to court approval'
 ]
 
 def parse_redfin_csv(filepath: str) -> List[Dict[str, Any]]:
