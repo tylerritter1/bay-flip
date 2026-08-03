@@ -1,6 +1,6 @@
 """
-Bay Flip Deal Scanner
-Main orchestrator for scanning, scoring, and analyzing real estate deals.
+Bay Opps Deal Scanner
+Main orchestrator for scanning, scoring, and analyzing real estate buy opportunities.
 """
 
 import os
@@ -357,7 +357,7 @@ def run_scan(csv_path: str = None, use_rentcast: bool = False, counties: List[st
     logger.info("Scan complete.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Bay Flip Deal Scanner")
+    parser = argparse.ArgumentParser(description="Bay Opps Deal Scanner")
     parser.add_argument("--csv", help="Path to Redfin CSV")
     parser.add_argument("--rentcast", action="store_true", help="Fetch from RentCast")
     parser.add_argument("--counties", help="Comma-separated county list")
