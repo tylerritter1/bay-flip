@@ -181,6 +181,46 @@
         select:focus, input:focus {
             border-color: var(--accent-blue);
         }
+        .range-slider {
+            position: relative;
+            width: 150px;
+            height: 30px;
+            margin-top: 5px;
+        }
+        .range-slider::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: var(--border-color);
+            top: 13px;
+            border-radius: 2px;
+        }
+        .range-slider input[type="range"] {
+            position: absolute;
+            left: 0;
+            top: 7px;
+            width: 100%;
+            pointer-events: none;
+            -webkit-appearance: none;
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+        .range-slider input[type="range"]:focus {
+            border: none;
+        }
+        .range-slider input[type="range"]::-webkit-slider-thumb {
+            pointer-events: all;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
         .btn {
             background: var(--surface-hover);
             border: 1px solid var(--border-color);
@@ -620,8 +660,11 @@
                 </select>
             </div>
             <div class="filter-group">
-                <label class="filter-label" id="price-label">Max Price: $3M+</label>
-                <input type="range" id="filter-price" min="500000" max="3000000" step="50000" value="3000000" style="accent-color: var(--accent-blue); width: 150px;">
+                <label class="filter-label" id="price-label">Price: &lt; $500k - $3M+</label>
+                <div class="range-slider">
+                    <input type="range" id="filter-price-min" min="500000" max="3000000" step="50000" value="500000">
+                    <input type="range" id="filter-price-max" min="500000" max="3000000" step="50000" value="3000000">
+                </div>
             </div>
             <div class="filter-group">
                 <label class="filter-label">Days on Market</label>
@@ -947,7 +990,7 @@
 
             // Filters & Sort
             const filterElements = [
-                'filter-county', 'filter-price', 'filter-dom', 
+                'filter-county', 'filter-price-min', 'filter-price-max', 'filter-dom', 
                 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 
                 'filter-show-hidden', 'filter-shortlisted', 'filter-price-reduced'
             ];
@@ -956,10 +999,22 @@
                 if (!el) return;
                 if (id === 'filter-search') {
                     el.addEventListener('keyup', applyFiltersAndSort);
-                } else if (id === 'filter-price') {
+                } else if (id === 'filter-price-min' || id === 'filter-price-max') {
                     el.addEventListener('input', (e) => {
-                        const val = parseInt(e.target.value);
-                        document.getElementById('price-label').textContent = 'Max Price: ' + (val >= 3000000 ? '$3M+' : formatMoney(val));
+                        let minVal = parseInt(document.getElementById('filter-price-min').value);
+                        let maxVal = parseInt(document.getElementById('filter-price-max').value);
+                        if (minVal > maxVal) {
+                            if (id === 'filter-price-min') {
+                                document.getElementById('filter-price-min').value = maxVal;
+                                minVal = maxVal;
+                            } else {
+                                document.getElementById('filter-price-max').value = minVal;
+                                maxVal = minVal;
+                            }
+                        }
+                        const minStr = minVal <= 500000 ? '< $500k' : formatMoney(minVal);
+                        const maxStr = maxVal >= 3000000 ? '$3M+' : formatMoney(maxVal);
+                        document.getElementById('price-label').textContent = `Price: ${minStr} - ${maxStr}`;
                         applyFiltersAndSort();
                     });
                 } else {
@@ -969,8 +1024,9 @@
 
             document.getElementById('btn-clear-filters').addEventListener('click', () => {
                 document.getElementById('filter-county').value = 'all';
-                document.getElementById('filter-price').value = '3000000';
-                document.getElementById('price-label').textContent = 'Max Price: $3M+';
+                document.getElementById('filter-price-min').value = '500000';
+                document.getElementById('filter-price-max').value = '3000000';
+                document.getElementById('price-label').textContent = 'Price: < $500k - $3M+';
                 document.getElementById('filter-dom').value = 'all';
                 document.getElementById('filter-sqft').value = '0';
                 document.getElementById('filter-schools').value = '0';
@@ -985,7 +1041,8 @@
 
         function applyFiltersAndSort() {
             const county = document.getElementById('filter-county').value;
-            const price = parseInt(document.getElementById('filter-price').value);
+            const minPrice = parseInt(document.getElementById('filter-price-min').value);
+            const maxPrice = parseInt(document.getElementById('filter-price-max').value);
             const domFilter = document.getElementById('filter-dom').value;
             const minSqft = parseInt(document.getElementById('filter-sqft').value);
             const schoolRating = parseInt(document.getElementById('filter-schools').value);
@@ -1008,7 +1065,8 @@
                 if (showPriceReducedOnly && (!p.price_drop_pct || p.price_drop_pct <= 0)) return false;
                 
                 if (county !== 'all' && p.county !== county) return false;
-                if (price < 3000000 && p.price > price) return false;
+                if (minPrice > 500000 && p.price < minPrice) return false;
+                if (maxPrice < 3000000 && p.price > maxPrice) return false;
                 
                 // Days on Market filter
                 if (domFilter === 'fresh' && p.dom >= 30) return false;
