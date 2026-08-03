@@ -261,7 +261,7 @@ def save_to_db(properties: List[Dict]):
                 year_built, days_on_market, price_per_sqft, property_type, listing_url,
                 latitude, longitude, distress_signals, deal_score, deal_tier, ai_analysis,
                 school_rating, first_seen, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 list_price=excluded.list_price,
                 beds=excluded.beds,
