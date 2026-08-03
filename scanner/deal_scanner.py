@@ -206,6 +206,21 @@ def save_to_db(properties: List[Dict]):
     conn.close()
     logger.info(f"Saved/Updated {count} properties to DB.")
 
+def log_scan_history(source: str, total_scanned: int, new_deals: int, top_deal: Dict = None):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now_date = datetime.now().strftime("%Y-%m-%d")
+    top_address = top_deal.get('address') if top_deal else 'N/A'
+    top_score = top_deal.get('deal_score') if top_deal else 0.0
+    
+    cursor.execute('''
+    INSERT INTO scan_history (scan_date, source, properties_scanned, new_deals_found, top_deal_address, top_deal_score)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ''', (now_date, source, total_scanned, new_deals, top_address, top_score))
+    conn.commit()
+    conn.close()
+    logger.info(f"Scan history logged: Scanned {total_scanned}, Found {new_deals} deals.")
+
 def run_scan(csv_path: str = None, use_rentcast: bool = False, counties: List[str] = None, 
              analyze: bool = False, email_to: str = None, dry_run: bool = False):
     
@@ -234,6 +249,9 @@ def run_scan(csv_path: str = None, use_rentcast: bool = False, counties: List[st
         properties = run_ai_analysis(properties, top_n=5)
         
     if not dry_run:
+        new_deals_count = len([p for p in properties if p.get('deal_tier') != 'pass'])
+        top_deal = properties[0] if properties else None
+        log_scan_history('Redfin CSV' if csv_path else 'RentCast', len(properties), new_deals_count, top_deal)
         save_to_db(properties)
         
     if email_to:
