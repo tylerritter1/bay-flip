@@ -81,6 +81,7 @@ def init_db():
         distress_signals TEXT,
         ai_analysis TEXT,
         listing_url TEXT,
+        school_rating INTEGER,
         first_seen TEXT,
         last_updated TEXT,
         is_active INTEGER DEFAULT 1
@@ -166,6 +167,19 @@ def get_county_from_city_or_zip(city: str, zip_code: str) -> str:
                 return "Contra Costa"
     return None
 
+def get_mock_school_rating(city: str) -> int:
+    city_lower = str(city).strip().lower() if city else ""
+    # Map cities to realistic average school ratings (1-10 scale)
+    ratings = {
+        "palo alto": 9, "cupertino": 9, "los altos": 9, "saratoga": 9, "st. helena": 9,
+        "mill valley": 8, "tiburon": 8, "orinda": 8, "lafayette": 8, "san ramon": 8, "pleasanton": 8,
+        "san francisco": 7, "san mateo": 7, "redwood city": 7, "sunnyvale": 7, "santa clara": 7, "novato": 7,
+        "walnut creek": 7, "sonoma": 7, "petaluma": 7,
+        "oakland": 5, "richmond": 5, "concord": 6, "antioch": 5, "pittsburg": 5, "hayward": 5, "fremont": 7,
+        "napa": 6, "santa rosa": 6
+    }
+    return ratings.get(city_lower, 6) # Default to 6 if unknown
+
 def ingest_redfin(csv_path: str) -> List[Dict]:
     logger.info(f"Ingesting Redfin CSV: {csv_path}")
     raw_props = parse_redfin_csv(csv_path)
@@ -192,6 +206,7 @@ def ingest_redfin(csv_path: str) -> List[Dict]:
             'source': 'redfin',
             'latitude': prop.get('latitude'),
             'longitude': prop.get('longitude'),
+            'school_rating': get_mock_school_rating(prop.get('city')),
         }
         
         # Clean numeric fields
@@ -245,8 +260,8 @@ def save_to_db(properties: List[Dict]):
                 source, address, city, county, zip, list_price, beds, baths, sqft, lot_sqft, 
                 year_built, days_on_market, price_per_sqft, property_type, listing_url,
                 latitude, longitude, distress_signals, deal_score, deal_tier, ai_analysis,
-                first_seen, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                school_rating, first_seen, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 list_price=excluded.list_price,
                 beds=excluded.beds,
@@ -264,6 +279,7 @@ def save_to_db(properties: List[Dict]):
                 deal_tier=excluded.deal_tier,
                 ai_analysis=excluded.ai_analysis,
                 county=excluded.county,
+                school_rating=excluded.school_rating,
                 last_updated=excluded.last_updated
             ''', (
                 p.get('source'), p.get('address'), p.get('city'), p.get('county'), p.get('zip'),
@@ -272,7 +288,7 @@ def save_to_db(properties: List[Dict]):
                 p.get('price_per_sqft'), p.get('property_type'), p.get('listing_url'),
                 p.get('latitude'), p.get('longitude'), p.get('distress_signals'),
                 p.get('deal_score'), p.get('deal_tier'), p.get('ai_analysis'),
-                now, now
+                p.get('school_rating'), now, now
             ))
             count += 1
         except Exception as e:

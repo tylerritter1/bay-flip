@@ -72,7 +72,8 @@ def get_sample_data():
             "ai_analysis": "This property shows potential for forced appreciation through cosmetic updates. The lot size is generous, providing potential for an ADU. Comps in the area suggest a strong ARV.",
             "lat": lat_base.get(county, 37.7) + random.uniform(-0.1, 0.1),
             "lng": lng_base.get(county, -122.2) + random.uniform(-0.1, 0.1),
-            "url": "#"
+            "url": "#",
+            "school_rating": random.randint(4, 10)
         })
     
     scan_history = [
@@ -132,7 +133,8 @@ def get_db_data(db_path):
                 "ai_analysis": r.get("ai_analysis", ""),
                 "lat": r.get("latitude"),
                 "lng": r.get("longitude"),
-                "url": r.get("listing_url", "#")
+                "url": r.get("listing_url", "#"),
+                "school_rating": r.get("school_rating") or 6
             })
         
         cur.execute("SELECT * FROM scan_history ORDER BY scan_date DESC LIMIT 10")

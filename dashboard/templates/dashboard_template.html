@@ -502,6 +502,35 @@
                 </select>
             </div>
             <div class="filter-group">
+                <label class="filter-label">Days on Market</label>
+                <select id="filter-dom">
+                    <option value="all">Any DOM</option>
+                    <option value="fresh">Fresh (&lt; 30 days)</option>
+                    <option value="medium">Medium (30 - 90 days)</option>
+                    <option value="stale">Stale (90+ days)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Min Sqft</label>
+                <select id="filter-sqft">
+                    <option value="0">Any Sqft</option>
+                    <option value="1000">1,000+ sqft</option>
+                    <option value="1500">1,500+ sqft</option>
+                    <option value="2000">2,000+ sqft</option>
+                    <option value="2500">2,500+ sqft</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">School Rating</label>
+                <select id="filter-schools">
+                    <option value="0">Any Rating</option>
+                    <option value="6">6+/10 Rating</option>
+                    <option value="7">7+/10 Rating</option>
+                    <option value="8">8+/10 Rating</option>
+                    <option value="9">9+/10 Rating</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label class="filter-label">Search</label>
                 <input type="text" id="filter-search" placeholder="City, Zip, Keyword...">
             </div>
@@ -661,6 +690,7 @@
                         <div class="tags-container">
                             <span class="tag ${prop.dom > 60 ? 'tag-dom-high' : ''}">${prop.dom} Days on Market</span>
                             <span class="tag">Built ${prop.year_built}</span>
+                            <span class="tag" style="${prop.school_rating >= 8 ? 'border-color: var(--accent-green); color: var(--accent-green); box-shadow: 0 0 8px rgba(0, 230, 118, 0.2);' : ''}">🎓 Schools: ${prop.school_rating}/10</span>
                             ${prop.property_type ? `<span class="tag">${prop.property_type}</span>` : ''}
                             ${(prop.distress_signals || []).map(s => `<span class="tag" style="border-color: var(--accent-amber); color: var(--accent-amber)">${s}</span>`).join('')}
                         </div>
@@ -715,7 +745,7 @@
             });
 
             // Filters & Sort
-            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-search', 'sort-select'];
+            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-dom', 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select'];
             filterElements.forEach(id => {
                 document.getElementById(id).addEventListener('change', applyFiltersAndSort);
                 if (id === 'filter-search') {
@@ -727,6 +757,9 @@
                 document.getElementById('filter-county').value = 'all';
                 document.getElementById('filter-tier').value = 'all';
                 document.getElementById('filter-price').value = '99999999';
+                document.getElementById('filter-dom').value = 'all';
+                document.getElementById('filter-sqft').value = '0';
+                document.getElementById('filter-schools').value = '0';
                 document.getElementById('filter-search').value = '';
                 document.getElementById('sort-select').value = 'score_desc';
                 applyFiltersAndSort();
@@ -737,6 +770,9 @@
             const county = document.getElementById('filter-county').value;
             const tier = document.getElementById('filter-tier').value;
             const price = parseInt(document.getElementById('filter-price').value);
+            const domFilter = document.getElementById('filter-dom').value;
+            const minSqft = parseInt(document.getElementById('filter-sqft').value);
+            const schoolRating = parseInt(document.getElementById('filter-schools').value);
             const search = document.getElementById('filter-search').value.toLowerCase();
             const sort = document.getElementById('sort-select').value;
 
@@ -745,6 +781,18 @@
                 if (county !== 'all' && p.county !== county) return false;
                 if (tier !== 'all' && p.tier !== tier) return false;
                 if (p.price > price) return false;
+                
+                // Days on Market filter
+                if (domFilter === 'fresh' && p.dom >= 30) return false;
+                if (domFilter === 'medium' && (p.dom < 30 || p.dom > 90)) return false;
+                if (domFilter === 'stale' && p.dom <= 90) return false;
+                
+                // Square Footage filter
+                if (p.sqft < minSqft) return false;
+                
+                // School Rating filter
+                if (p.school_rating < schoolRating) return false;
+                
                 if (search && !(`${p.address} ${p.city} ${p.zip}`.toLowerCase().includes(search))) return false;
                 return true;
             });
