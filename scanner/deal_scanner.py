@@ -123,7 +123,7 @@ def ingest_redfin(csv_path: str) -> List[Dict]:
             'days_on_market': prop.get('days_on_market'),
             'price_per_sqft': prop.get('price_per_sqft') or prop.get('$/square_feet'),
             'property_type': prop.get('property_type'),
-            'listing_url': prop.get('url_(link)'),
+            'listing_url': prop.get('listing_url') or prop.get('url_(link)') or next((v for k, v in prop.items() if k.startswith('url')), None),
             'source': 'redfin',
             'latitude': prop.get('latitude'),
             'longitude': prop.get('longitude'),
