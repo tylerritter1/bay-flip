@@ -177,7 +177,7 @@ def get_mock_school_rating(city: str) -> int:
     city_lower = str(city).strip().lower() if city else ""
     # Map cities to realistic average school ratings (1-10 scale)
     ratings = {
-        "palo alto": 9, "cupertino": 9, "los altos": 9, "saratoga": 9, "st. helena": 9, "danville": 9, "moraga": 9, "piedmont": 9,
+        "palo alto": 9, "cupertino": 9, "los altos": 9, "saratoga": 9, "st. helena": 9, "st helena": 9, "saint helena": 9, "danville": 9, "moraga": 9, "piedmont": 9,
         "mill valley": 8, "tiburon": 8, "orinda": 8, "lafayette": 8, "san ramon": 8, "pleasanton": 8, "berkeley": 8,
         "san francisco": 7, "san mateo": 7, "redwood city": 7, "sunnyvale": 7, "santa clara": 7, "novato": 7,
         "walnut creek": 7, "sonoma": 7, "petaluma": 7, "alameda": 7,
