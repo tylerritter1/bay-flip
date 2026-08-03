@@ -251,10 +251,60 @@
             display: flex;
             flex-direction: column;
         }
+        .deal-card.shortlisted {
+            border-color: var(--accent-green) !important;
+            box-shadow: 0 0 15px rgba(0, 230, 118, 0.15) !important;
+        }
         .deal-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
             border-color: rgba(255,255,255,0.1);
+        }
+        .deal-card.shortlisted:hover {
+            border-color: var(--accent-green) !important;
+            box-shadow: 0 10px 20px rgba(0, 230, 118, 0.25) !important;
+        }
+        .btn-action-check {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            width: 38px;
+            height: 38px;
+            border-radius: 6px;
+            transition: var(--transition-smooth);
+        }
+        .btn-action-check:hover, .btn-action-check.active {
+            background: var(--accent-green) !important;
+            color: #000 !important;
+            border-color: var(--accent-green) !important;
+            box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+        }
+        .btn-action-x {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            width: 38px;
+            height: 38px;
+            border-radius: 6px;
+            transition: var(--transition-smooth);
+        }
+        .btn-action-x:hover {
+            background: var(--accent-red) !important;
+            color: #fff !important;
+            border-color: var(--accent-red) !important;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.4);
         }
         .card-header {
             padding: 20px 20px 10px;
@@ -530,6 +580,10 @@
                     <option value="9">9+/10 Rating</option>
                 </select>
             </div>
+            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
+                <input type="checkbox" id="filter-show-hidden" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-blue);">
+                <label for="filter-show-hidden" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">Show Hidden</label>
+            </div>
             <div class="filter-group">
                 <label class="filter-label">Search</label>
                 <input type="text" id="filter-search" placeholder="City, Zip, Keyword...">
@@ -625,6 +679,40 @@
         let currentProperties = [...PROPERTIES];
         let mapInstance = null;
         let markerCluster = null;
+        let shortlistedIds = JSON.parse(localStorage.getItem('shortlisted_ids') || '[]');
+        let hiddenIds = JSON.parse(localStorage.getItem('hidden_ids') || '[]');
+        
+        function toggleCheck(id, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const strId = String(id);
+            const index = shortlistedIds.indexOf(strId);
+            if (index > -1) {
+                shortlistedIds.splice(index, 1);
+            } else {
+                shortlistedIds.push(strId);
+            }
+            localStorage.setItem('shortlisted_ids', JSON.stringify(shortlistedIds));
+            applyFiltersAndSort();
+        }
+        
+        function toggleHide(id, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const strId = String(id);
+            const index = hiddenIds.indexOf(strId);
+            if (index > -1) {
+                hiddenIds.splice(index, 1);
+            } else {
+                hiddenIds.push(strId);
+            }
+            localStorage.setItem('hidden_ids', JSON.stringify(hiddenIds));
+            applyFiltersAndSort();
+        }
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
@@ -661,8 +749,11 @@
                 else if (prop.score >= 60) tierClass = 'tier-worth';
                 else if (prop.score >= 40) tierClass = 'tier-monitor';
                 
+                const isShortlisted = shortlistedIds.includes(String(prop.id)) || shortlistedIds.includes(Number(prop.id));
+                const isHidden = hiddenIds.includes(String(prop.id)) || hiddenIds.includes(Number(prop.id));
+                
                 const card = document.createElement('div');
-                card.className = 'deal-card';
+                card.className = `deal-card ${isShortlisted ? 'shortlisted' : ''}`;
                 card.innerHTML = `
                     <div class="card-header">
                         <div class="score-badge ${tierClass}">${prop.score}</div>
@@ -698,8 +789,10 @@
                         <div class="ai-analysis">${prop.ai_analysis || 'No detailed analysis available.'}</div>
                     </div>
                     
-                    <div class="card-footer">
-                        <a href="${prop.url}" target="_blank" class="btn btn-primary">View Listing</a>
+                    <div class="card-footer" style="display: flex; gap: 8px; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-color); margin-top: auto;">
+                        <a href="${prop.url}" target="_blank" class="btn btn-primary" style="flex: 1; text-align: center; display: block; text-decoration: none; padding: 8px 0;">View Listing</a>
+                        <button class="btn-action-check ${isShortlisted ? 'active' : ''}" onclick="toggleCheck('${prop.id}', event)" title="Shortlist / Mark Reviewed">✓</button>
+                        <button class="btn-action-x" onclick="toggleHide('${prop.id}', event)" title="${isHidden ? 'Unhide property' : 'Hide property'}">${isHidden ? '↺' : '×'}</button>
                     </div>
                 `;
                 
@@ -745,11 +838,15 @@
             });
 
             // Filters & Sort
-            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-dom', 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select'];
+            const filterElements = ['filter-county', 'filter-tier', 'filter-price', 'filter-dom', 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 'filter-show-hidden'];
             filterElements.forEach(id => {
-                document.getElementById(id).addEventListener('change', applyFiltersAndSort);
-                if (id === 'filter-search') {
-                    document.getElementById(id).addEventListener('keyup', applyFiltersAndSort);
+                const el = document.getElementById(id);
+                if (id === 'filter-show-hidden') {
+                    el.addEventListener('change', applyFiltersAndSort);
+                } else if (id === 'filter-search') {
+                    el.addEventListener('keyup', applyFiltersAndSort);
+                } else {
+                    el.addEventListener('change', applyFiltersAndSort);
                 }
             });
 
@@ -760,6 +857,7 @@
                 document.getElementById('filter-dom').value = 'all';
                 document.getElementById('filter-sqft').value = '0';
                 document.getElementById('filter-schools').value = '0';
+                document.getElementById('filter-show-hidden').checked = false;
                 document.getElementById('filter-search').value = '';
                 document.getElementById('sort-select').value = 'score_desc';
                 applyFiltersAndSort();
@@ -773,11 +871,16 @@
             const domFilter = document.getElementById('filter-dom').value;
             const minSqft = parseInt(document.getElementById('filter-sqft').value);
             const schoolRating = parseInt(document.getElementById('filter-schools').value);
+            const showHidden = document.getElementById('filter-show-hidden').checked;
             const search = document.getElementById('filter-search').value.toLowerCase();
             const sort = document.getElementById('sort-select').value;
 
             // Filter
             currentProperties = PROPERTIES.filter(p => {
+                // Hidden filter
+                const isHidden = hiddenIds.includes(String(p.id)) || hiddenIds.includes(Number(p.id));
+                if (isHidden && !showHidden) return false;
+                
                 if (county !== 'all' && p.county !== county) return false;
                 if (tier !== 'all' && p.tier !== tier) return false;
                 if (p.price > price) return false;
