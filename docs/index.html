@@ -577,7 +577,7 @@
                 🏠 <span>Bay Opps</span>
             </div>
             <div class="header-meta">
-                Last updated: 2026-08-03 07:26:41
+                Last updated: 2026-08-03 07:28:25
             </div>
         </div>
     </header>
@@ -765,7 +765,7 @@
 
     <footer>
         <div class="container">
-            Built with Bay Opps v1.0 • Data generated at 2026-08-03 07:26:41
+            Built with Bay Opps v1.0 • Data generated at 2026-08-03 07:28:25
         </div>
     </footer>
 
@@ -1154,8 +1154,9 @@
             });
 
             // City Avg Price Chart
-            const cities = Object.keys(CHART_DATA.city_avg);
-            const avgPrices = Object.values(CHART_DATA.city_avg);
+            const cityEntries = Object.entries(CHART_DATA.city_avg).sort((a, b) => a[1] - b[1]);
+            const cities = cityEntries.map(e => e[0]);
+            const avgPrices = cityEntries.map(e => e[1]);
             
             const ctxPrice = document.getElementById('chart-price').getContext('2d');
             new Chart(ctxPrice, {
