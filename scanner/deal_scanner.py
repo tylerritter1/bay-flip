@@ -241,9 +241,13 @@ def ingest_redfin(csv_path: str) -> List[Dict]:
     enriched = []
     
     for prop in raw_props:
+        address = prop.get('address')
+        if not address or not str(address).strip() or str(address).lower().strip().startswith('in accordance'):
+            continue
+            
         # Standardize keys to match DB schema
         p = {
-            'address': prop.get('address'),
+            'address': address,
             'city': prop.get('city'),
             'county': get_county_from_city_or_zip(prop.get('city'), prop.get('zip_or_postal_code')),
             'zip': prop.get('zip_or_postal_code'),

@@ -101,8 +101,8 @@ def get_sample_data():
         {"date": datetime.now().strftime("%Y-%m-%d"), "source": "MLS", "scanned": 1500, "new_deals": 12, "top_deal": properties[0]['address'], "top_score": properties[0]['score']},
         {"date": "2023-10-26", "source": "Zillow", "scanned": 1200, "new_deals": 5, "top_deal": "456 Oak Ave", "top_score": 92}
     ]
-    # Filter out Pass tier properties to match actual DB query behavior
-    filtered_properties = [p for p in properties if p['tier'] != "Pass"]
+    # Filter out Pass tier properties to match actual DB query behavior (retaining those with price drops)
+    filtered_properties = [p for p in properties if p['tier'] != "Pass" or p['price_drop_pct'] > 0]
     return filtered_properties, scan_history
 
 def get_db_data(db_path):
@@ -116,7 +116,7 @@ def get_db_data(db_path):
         if not cur.fetchone():
             return [], []
             
-        cur.execute("SELECT * FROM properties WHERE is_active = 1 AND deal_tier != 'pass'")
+        cur.execute("SELECT * FROM properties WHERE is_active = 1 AND (deal_tier != 'pass' OR price_drop_pct > 0)")
         raw_props = [dict(row) for row in cur.fetchall()]
         
         # Map DB column names to template-expected keys
