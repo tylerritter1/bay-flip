@@ -33,6 +33,8 @@ def parse_redfin_csv(filepath: str) -> List[Dict[str, Any]]:
                         continue
                     # Normalize keys: upper to lower, spaces to underscores
                     norm_key = k.strip().lower().replace(' ', '_').replace('$/square_feet', 'price_per_sqft').replace('$/sqft', 'price_per_sqft')
+                    if norm_key.startswith('url'):
+                        norm_key = 'listing_url'
                     norm_row[norm_key] = v
                 properties.append(norm_row)
     except Exception as e:
