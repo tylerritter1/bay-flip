@@ -620,23 +620,8 @@
                 </select>
             </div>
             <div class="filter-group">
-                <label class="filter-label">Score Tier</label>
-                <select id="filter-tier">
-                    <option value="all">All Tiers</option>
-                    <option value="Strong Buy">🔥 Strong Buy</option>
-                    <option value="Worth a Look">⚡ Worth a Look</option>
-                    <option value="Monitor">📊 Monitor</option>
-                    <option value="Pass">❌ Pass</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label class="filter-label">Max Price</label>
-                <select id="filter-price">
-                    <option value="99999999">Any Price</option>
-                    <option value="1000000">< $1M</option>
-                    <option value="1500000">< $1.5M</option>
-                    <option value="2000000">< $2M</option>
-                </select>
+                <label class="filter-label" id="price-label">Max Price: $3M+</label>
+                <input type="range" id="filter-price" min="500000" max="3000000" step="50000" value="3000000" style="accent-color: var(--accent-blue); width: 150px;">
             </div>
             <div class="filter-group">
                 <label class="filter-label">Days on Market</label>
@@ -675,14 +660,7 @@
                 <input type="checkbox" id="filter-shortlisted" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-amber);">
                 <label for="filter-shortlisted" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">✓ Shortlisted Only</label>
             </div>
-            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
-                <input type="checkbox" id="filter-adu" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-green);">
-                <label for="filter-adu" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">🏡 ADU Potential</label>
-            </div>
-            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
-                <input type="checkbox" id="filter-probate" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-purple);">
-                <label for="filter-probate" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">⚖️ Probate/Trust</label>
-            </div>
+
             <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
                 <input type="checkbox" id="filter-price-reduced" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-blue);">
                 <label for="filter-price-reduced" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">🏷️ Price Reduced</label>
@@ -969,15 +947,21 @@
 
             // Filters & Sort
             const filterElements = [
-                'filter-county', 'filter-tier', 'filter-price', 'filter-dom', 
+                'filter-county', 'filter-price', 'filter-dom', 
                 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 
-                'filter-show-hidden', 'filter-shortlisted', 'filter-adu', 'filter-probate', 'filter-price-reduced'
+                'filter-show-hidden', 'filter-shortlisted', 'filter-price-reduced'
             ];
             filterElements.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (id === 'filter-search') {
                     el.addEventListener('keyup', applyFiltersAndSort);
+                } else if (id === 'filter-price') {
+                    el.addEventListener('input', (e) => {
+                        const val = parseInt(e.target.value);
+                        document.getElementById('price-label').textContent = 'Max Price: ' + (val >= 3000000 ? '$3M+' : formatMoney(val));
+                        applyFiltersAndSort();
+                    });
                 } else {
                     el.addEventListener('change', applyFiltersAndSort);
                 }
@@ -985,15 +969,13 @@
 
             document.getElementById('btn-clear-filters').addEventListener('click', () => {
                 document.getElementById('filter-county').value = 'all';
-                document.getElementById('filter-tier').value = 'all';
-                document.getElementById('filter-price').value = '99999999';
+                document.getElementById('filter-price').value = '3000000';
+                document.getElementById('price-label').textContent = 'Max Price: $3M+';
                 document.getElementById('filter-dom').value = 'all';
                 document.getElementById('filter-sqft').value = '0';
                 document.getElementById('filter-schools').value = '0';
                 document.getElementById('filter-show-hidden').checked = false;
                 document.getElementById('filter-shortlisted').checked = false;
-                document.getElementById('filter-adu').checked = false;
-                document.getElementById('filter-probate').checked = false;
                 document.getElementById('filter-price-reduced').checked = false;
                 document.getElementById('filter-search').value = '';
                 document.getElementById('sort-select').value = 'score_desc';
@@ -1003,7 +985,6 @@
 
         function applyFiltersAndSort() {
             const county = document.getElementById('filter-county').value;
-            const tier = document.getElementById('filter-tier').value;
             const price = parseInt(document.getElementById('filter-price').value);
             const domFilter = document.getElementById('filter-dom').value;
             const minSqft = parseInt(document.getElementById('filter-sqft').value);
@@ -1011,8 +992,6 @@
             
             const showHidden = document.getElementById('filter-show-hidden').checked;
             const showShortlistedOnly = document.getElementById('filter-shortlisted').checked;
-            const showAduOnly = document.getElementById('filter-adu').checked;
-            const showProbateOnly = document.getElementById('filter-probate').checked;
             const showPriceReducedOnly = document.getElementById('filter-price-reduced').checked;
             
             const search = document.getElementById('filter-search').value.toLowerCase();
@@ -1026,13 +1005,10 @@
                 
                 // Toggle filters
                 if (showShortlistedOnly && !(shortlistedIds.includes(String(p.id)) || shortlistedIds.includes(Number(p.id)))) return false;
-                if (showAduOnly && !p.adu_potential) return false;
-                if (showProbateOnly && !p.probate_flag) return false;
                 if (showPriceReducedOnly && (!p.price_drop_pct || p.price_drop_pct <= 0)) return false;
                 
                 if (county !== 'all' && p.county !== county) return false;
-                if (tier !== 'all' && p.tier !== tier) return false;
-                if (p.price > price) return false;
+                if (price < 3000000 && p.price > price) return false;
                 
                 // Days on Market filter
                 if (domFilter === 'fresh' && p.dom >= 30) return false;
