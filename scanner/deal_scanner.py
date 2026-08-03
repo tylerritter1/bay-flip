@@ -102,6 +102,70 @@ def init_db():
     conn.commit()
     conn.close()
 
+CITY_TO_COUNTY = {
+    "san francisco": "San Francisco",
+    "oakland": "Alameda", "berkeley": "Alameda", "hayward": "Alameda", "fremont": "Alameda",
+    "alameda": "Alameda", "pleasanton": "Alameda", "livermore": "Alameda", "san leandro": "Alameda",
+    "union city": "Alameda", "dublin": "Alameda", "newark": "Alameda", "albany": "Alameda",
+    "emeryville": "Alameda", "piedmont": "Alameda", "castro valley": "Alameda",
+    "walnut creek": "Contra Costa", "concord": "Contra Costa", "richmond": "Contra Costa",
+    "san ramon": "Contra Costa", "antioch": "Contra Costa", "pittsburg": "Contra Costa",
+    "brentwood": "Contra Costa", "martinez": "Contra Costa", "danville": "Contra Costa",
+    "orinda": "Contra Costa", "lafayette": "Contra Costa", "moraga": "Contra Costa",
+    "el cerrito": "Contra Costa", "hercules": "Contra Costa", "pinole": "Contra Costa",
+    "pacheco": "Contra Costa", "clayton": "Contra Costa", "oakley": "Contra Costa",
+    "san rafael": "Marin", "mill valley": "Marin", "novato": "Marin", "tiburon": "Marin",
+    "sausalito": "Marin", "san anselmo": "Marin", "larkspur": "Marin", "corte madera": "Marin",
+    "ross": "Marin", "fairfax": "Marin", "belvedere": "Marin",
+    "napa": "Napa", "st. helena": "Napa", "calistoga": "Napa", "yountville": "Napa",
+    "american canyon": "Napa", "angwin": "Napa", "pope valley": "Napa",
+    "san mateo": "San Mateo", "redwood city": "San Mateo", "south san francisco": "San Mateo",
+    "daly city": "San Mateo", "san bruno": "San Mateo", "pacifica": "San Mateo",
+    "menlo park": "San Mateo", "foster city": "San Mateo", "burlingame": "San Mateo",
+    "san carlos": "San Mateo", "east palo alto": "San Mateo", "belmont": "San Mateo",
+    "millbrae": "San Mateo", "hillsborough": "San Mateo", "woodside": "San Mateo",
+    "portola valley": "San Mateo", "brisbane": "San Mateo", "colma": "San Mateo",
+    "half moon bay": "San Mateo", "el granada": "San Mateo",
+    "san jose": "Santa Clara", "palo alto": "Santa Clara", "mountain view": "Santa Clara",
+    "sunnyvale": "Santa Clara", "santa clara": "Santa Clara", "cupertino": "Santa Clara",
+    "milpitas": "Santa Clara", "gilroy": "Santa Clara", "campbell": "Santa Clara",
+    "morgan hill": "Santa Clara", "los gatos": "Santa Clara", "los altos": "Santa Clara",
+    "saratoga": "Santa Clara", "los altos hills": "Santa Clara", "alviso": "Santa Clara",
+    "santa rosa": "Sonoma", "petaluma": "Sonoma", "sonoma": "Sonoma", "rohnert park": "Sonoma",
+    "windsor": "Sonoma", "healdsburg": "Sonoma", "cloverdale": "Sonoma", "sebastopol": "Sonoma",
+    "guerneville": "Sonoma", "bodega bay": "Sonoma", "cotati": "Sonoma"
+}
+
+def get_county_from_city_or_zip(city: str, zip_code: str) -> str:
+    if not city and not zip_code:
+        return None
+    city_clean = str(city).strip().lower() if city else ""
+    if city_clean in CITY_TO_COUNTY:
+        return CITY_TO_COUNTY[city_clean]
+    if zip_code:
+        zip_str = str(zip_code).strip()[:5]
+        if zip_str.isdigit():
+            z = int(zip_str)
+            if 94101 <= z <= 94188:
+                return "San Francisco"
+            elif (94002 <= z <= 94080) or (94401 <= z <= 94404):
+                return "San Mateo"
+            elif (94301 <= z <= 94306) or (95008 <= z <= 95070 and z != 95060) or (95101 <= z <= 95196):
+                return "Santa Clara"
+            elif 94901 <= z <= 94998:
+                if z in [94952, 94954]:
+                    return "Sonoma"
+                return "Marin"
+            elif 95401 <= z <= 95492:
+                return "Sonoma"
+            elif 94558 <= z <= 94576:
+                return "Napa"
+            elif z in [94501, 94502] or (94536 <= z <= 94545) or (94550 <= z <= 94552) or z == 94568 or (94577 <= z <= 94580) or (94586 <= z <= 94588) or (94601 <= z <= 94662):
+                return "Alameda"
+            elif (94509 <= z <= 94531) or (94547 <= z <= 94565) or z in [94572, 94582, 94583] or (94595 <= z <= 94598) or (94801 <= z <= 94850):
+                return "Contra Costa"
+    return None
+
 def ingest_redfin(csv_path: str) -> List[Dict]:
     logger.info(f"Ingesting Redfin CSV: {csv_path}")
     raw_props = parse_redfin_csv(csv_path)
@@ -112,6 +176,7 @@ def ingest_redfin(csv_path: str) -> List[Dict]:
         p = {
             'address': prop.get('address'),
             'city': prop.get('city'),
+            'county': get_county_from_city_or_zip(prop.get('city'), prop.get('zip_or_postal_code')),
             'zip': prop.get('zip_or_postal_code'),
             'state': prop.get('state_or_province'),
             'list_price': prop.get('price'),
@@ -177,11 +242,11 @@ def save_to_db(properties: List[Dict]):
         try:
             cursor.execute('''
             INSERT INTO properties (
-                source, address, city, zip, list_price, beds, baths, sqft, lot_sqft, 
+                source, address, city, county, zip, list_price, beds, baths, sqft, lot_sqft, 
                 year_built, days_on_market, price_per_sqft, property_type, listing_url,
                 latitude, longitude, distress_signals, deal_score, deal_tier, ai_analysis,
                 first_seen, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 list_price=excluded.list_price,
                 beds=excluded.beds,
@@ -198,9 +263,10 @@ def save_to_db(properties: List[Dict]):
                 deal_score=excluded.deal_score,
                 deal_tier=excluded.deal_tier,
                 ai_analysis=excluded.ai_analysis,
+                county=excluded.county,
                 last_updated=excluded.last_updated
             ''', (
-                p.get('source'), p.get('address'), p.get('city'), p.get('zip'),
+                p.get('source'), p.get('address'), p.get('city'), p.get('county'), p.get('zip'),
                 p.get('list_price'), p.get('beds'), p.get('baths'), p.get('sqft'),
                 p.get('lot_sqft'), p.get('year_built'), p.get('days_on_market'),
                 p.get('price_per_sqft'), p.get('property_type'), p.get('listing_url'),
