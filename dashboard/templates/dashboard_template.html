@@ -672,6 +672,10 @@
                 <label for="filter-show-hidden" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">Show Hidden</label>
             </div>
             <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
+                <input type="checkbox" id="filter-shortlisted" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-amber);">
+                <label for="filter-shortlisted" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">✓ Shortlisted Only</label>
+            </div>
+            <div class="filter-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 20px; padding: 5px 0;">
                 <input type="checkbox" id="filter-adu" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent-green);">
                 <label for="filter-adu" class="filter-label" style="margin: 0; cursor: pointer; white-space: nowrap; user-select: none;">🏡 ADU Potential</label>
             </div>
@@ -967,7 +971,7 @@
             const filterElements = [
                 'filter-county', 'filter-tier', 'filter-price', 'filter-dom', 
                 'filter-sqft', 'filter-schools', 'filter-search', 'sort-select', 
-                'filter-show-hidden', 'filter-adu', 'filter-probate', 'filter-price-reduced'
+                'filter-show-hidden', 'filter-shortlisted', 'filter-adu', 'filter-probate', 'filter-price-reduced'
             ];
             filterElements.forEach(id => {
                 const el = document.getElementById(id);
@@ -987,6 +991,7 @@
                 document.getElementById('filter-sqft').value = '0';
                 document.getElementById('filter-schools').value = '0';
                 document.getElementById('filter-show-hidden').checked = false;
+                document.getElementById('filter-shortlisted').checked = false;
                 document.getElementById('filter-adu').checked = false;
                 document.getElementById('filter-probate').checked = false;
                 document.getElementById('filter-price-reduced').checked = false;
@@ -1005,6 +1010,7 @@
             const schoolRating = parseInt(document.getElementById('filter-schools').value);
             
             const showHidden = document.getElementById('filter-show-hidden').checked;
+            const showShortlistedOnly = document.getElementById('filter-shortlisted').checked;
             const showAduOnly = document.getElementById('filter-adu').checked;
             const showProbateOnly = document.getElementById('filter-probate').checked;
             const showPriceReducedOnly = document.getElementById('filter-price-reduced').checked;
@@ -1019,6 +1025,7 @@
                 if (isHidden && !showHidden) return false;
                 
                 // Toggle filters
+                if (showShortlistedOnly && !(shortlistedIds.includes(String(p.id)) || shortlistedIds.includes(Number(p.id)))) return false;
                 if (showAduOnly && !p.adu_potential) return false;
                 if (showProbateOnly && !p.probate_flag) return false;
                 if (showPriceReducedOnly && (!p.price_drop_pct || p.price_drop_pct <= 0)) return false;
